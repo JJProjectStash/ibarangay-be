@@ -12,6 +12,7 @@ import serviceRoutes from "./routes/serviceRoutes";
 import complaintRoutes from "./routes/complaintRoutes";
 import eventRoutes from "./routes/eventRoutes";
 import notificationRoutes from "./routes/notificationRoutes";
+import dashboardRoutes from "./routes/dashboardRoutes";
 
 const app: Application = express();
 
@@ -60,6 +61,7 @@ app.use(`/api/${apiVersion}/services`, serviceRoutes);
 app.use(`/api/${apiVersion}/complaints`, complaintRoutes);
 app.use(`/api/${apiVersion}/events`, eventRoutes);
 app.use(`/api/${apiVersion}/notifications`, notificationRoutes);
+app.use(`/api/${apiVersion}/dashboard`, dashboardRoutes);
 
 // 404 handler
 app.use((_req, res) => {

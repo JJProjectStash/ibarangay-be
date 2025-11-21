@@ -32,6 +32,22 @@ export interface IService extends Document {
   updatedAt: Date;
 }
 
+export interface IComplaintComment {
+  userId: Types.ObjectId;
+  message: string;
+  isInternal: boolean;
+  createdAt: Date;
+}
+
+export interface IComplaintHistory {
+  action: string;
+  performedBy: Types.ObjectId;
+  previousStatus?: string;
+  newStatus?: string;
+  notes?: string;
+  timestamp: Date;
+}
+
 export interface IComplaint extends Document {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
@@ -42,8 +58,15 @@ export interface IComplaint extends Document {
   priority: "low" | "medium" | "high";
   attachments?: string[];
   response?: string;
+  assignedTo?: Types.ObjectId;
   resolvedBy?: Types.ObjectId;
   resolvedAt?: Date;
+  comments: IComplaintComment[];
+  history: IComplaintHistory[];
+  rating?: number;
+  feedback?: string;
+  escalationLevel: number;
+  lastEscalatedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -87,4 +110,18 @@ export interface AuthRequest extends Request {
 export interface JWTPayload {
   id: string;
   role: string;
+}
+
+export interface DashboardStats {
+  totalComplaints: number;
+  pendingComplaints: number;
+  inProgressComplaints: number;
+  resolvedComplaints: number;
+  totalServices: number;
+  totalEvents: number;
+  totalUsers: number;
+  complaintsByCategory: Array<{ category: string; count: number }>;
+  complaintsByPriority: Array<{ priority: string; count: number }>;
+  recentActivity: Array<any>;
+  averageResolutionTime: number;
 }

@@ -1,6 +1,45 @@
 import mongoose, { Schema } from "mongoose";
 import { IComplaint } from "../types";
 
+const complaintCommentSchema = new Schema({
+  userId: {
+    type: Schema.Types.ObjectId,
+    required: true,
+    ref: "User",
+  },
+  message: {
+    type: String,
+    required: true,
+  },
+  isInternal: {
+    type: Boolean,
+    default: false,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+const complaintHistorySchema = new Schema({
+  action: {
+    type: String,
+    required: true,
+  },
+  performedBy: {
+    type: Schema.Types.ObjectId,
+    required: true,
+    ref: "User",
+  },
+  previousStatus: String,
+  newStatus: String,
+  notes: String,
+  timestamp: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
 const complaintSchema = new Schema<IComplaint>(
   {
     userId: {
@@ -39,11 +78,32 @@ const complaintSchema = new Schema<IComplaint>(
     response: {
       type: String,
     },
+    assignedTo: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+    },
     resolvedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
     resolvedAt: {
+      type: Date,
+    },
+    comments: [complaintCommentSchema],
+    history: [complaintHistorySchema],
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+    },
+    feedback: {
+      type: String,
+    },
+    escalationLevel: {
+      type: Number,
+      default: 0,
+    },
+    lastEscalatedAt: {
       type: Date,
     },
   },
@@ -56,5 +116,7 @@ const complaintSchema = new Schema<IComplaint>(
 complaintSchema.index({ userId: 1, status: 1 });
 complaintSchema.index({ status: 1, priority: 1 });
 complaintSchema.index({ createdAt: -1 });
+complaintSchema.index({ assignedTo: 1 });
+complaintSchema.index({ category: 1 });
 
 export default mongoose.model<IComplaint>("Complaint", complaintSchema);
