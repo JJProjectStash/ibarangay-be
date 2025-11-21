@@ -131,7 +131,11 @@ export const registerForEvent = async (
     const userId = new Types.ObjectId(req.user?.id);
 
     // Check if already registered
-    if (event.attendees.some((attendee) => attendee.equals(userId))) {
+    if (
+      event.attendees.some((attendee: Types.ObjectId) =>
+        attendee.equals(userId)
+      )
+    ) {
       res.status(400).json({
         success: false,
         message: "Already registered for this event",
@@ -194,7 +198,11 @@ export const unregisterFromEvent = async (
     const userId = new Types.ObjectId(req.user?.id);
 
     // Check if registered
-    if (!event.attendees.some((attendee) => attendee.equals(userId))) {
+    if (
+      !event.attendees.some((attendee: Types.ObjectId) =>
+        attendee.equals(userId)
+      )
+    ) {
       res.status(400).json({
         success: false,
         message: "Not registered for this event",
@@ -203,7 +211,7 @@ export const unregisterFromEvent = async (
     }
 
     event.attendees = event.attendees.filter(
-      (attendeeId) => !attendeeId.equals(userId)
+      (attendeeId: Types.ObjectId) => !attendeeId.equals(userId)
     );
     await event.save();
 
