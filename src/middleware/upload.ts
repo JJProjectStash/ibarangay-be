@@ -17,11 +17,11 @@ const eventsDir = path.join(uploadDir, "events");
 
 // Storage configuration
 const storage = multer.diskStorage({
-  destination: (req: Request, file: Express.Multer.File, cb) => {
+  destination: (req: Request, _file: Express.Multer.File, cb) => {
     const type = req.baseUrl.includes("complaints") ? "complaints" : "events";
     cb(null, path.join(uploadDir, type));
   },
-  filename: (req: Request, file: Express.Multer.File, cb) => {
+  filename: (_req: Request, file: Express.Multer.File, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     const ext = path.extname(file.originalname);
     const name = path.basename(file.originalname, ext).replace(/\s+/g, "-");
@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (
-  req: Request,
+  _req: Request,
   file: Express.Multer.File,
   cb: FileFilterCallback
 ) => {
@@ -70,7 +70,7 @@ export const upload = multer({
 // Image optimization middleware
 export const optimizeImage = async (
   req: Request,
-  res: any,
+  _res: any,
   next: any
 ): Promise<void> => {
   if (!req.file || !req.file.mimetype.startsWith("image/")) {

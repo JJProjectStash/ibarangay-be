@@ -154,7 +154,7 @@ export const getStaffPerformance = async (
 };
 
 export const getCategoryAnalytics = async (
-  req: AuthRequest,
+  _req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
@@ -222,7 +222,7 @@ export const getCategoryAnalytics = async (
 };
 
 export const getResponseTimeAnalytics = async (
-  req: AuthRequest,
+  _req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
