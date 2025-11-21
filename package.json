@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint . --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "seed": "ts-node scripts/seed.ts",
+    "db:init": "mongosh mongodb://localhost:27017/barangay_services scripts/init-db.js"
   },
   "keywords": [
     "barangay",
