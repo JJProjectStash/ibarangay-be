@@ -99,8 +99,7 @@ userSchema.virtual("fullName").get(function () {
 userSchema.set("toJSON", { virtuals: true });
 userSchema.set("toObject", { virtuals: true });
 
-// Indexes for faster queries
-userSchema.index({ email: 1 }, { unique: true });
+// Indexes for faster queries - removed duplicate email index
 userSchema.index({ role: 1 });
 userSchema.index({ isVerified: 1 });
 userSchema.index({ createdAt: -1 });
