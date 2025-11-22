@@ -18,6 +18,7 @@ import uploadRoutes from "./routes/uploadRoutes";
 import bulkRoutes from "./routes/bulkRoutes";
 import analyticsRoutes from "./routes/analyticsRoutes";
 import announcementRoutes from "./routes/announcementRoutes";
+import adminRoutes from "./routes/adminRoutes";
 
 const app: Application = express();
 
@@ -116,6 +117,7 @@ app.use(`/api/${apiVersion}/upload`, uploadRoutes);
 app.use(`/api/${apiVersion}/bulk`, bulkRoutes);
 app.use(`/api/${apiVersion}/analytics`, analyticsRoutes);
 app.use(`/api/${apiVersion}/announcements`, announcementRoutes);
+app.use(`/api/${apiVersion}/admin`, adminRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
