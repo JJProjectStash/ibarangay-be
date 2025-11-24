@@ -18,13 +18,13 @@ router.put(
   "/complaint-categories",
   authenticate,
   authorize("admin", "staff"),
-  updateComplaintCategories
+  updateComplaintCategories,
 );
 router.put(
   "/service-item-types",
   authenticate,
   authorize("admin", "staff"),
-  updateServiceItemTypes
+  updateServiceItemTypes,
 );
 
 export default router;

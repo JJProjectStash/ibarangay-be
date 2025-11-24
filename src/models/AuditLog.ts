@@ -55,7 +55,7 @@ const auditLogSchema = new Schema<IAuditLog>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for faster queries

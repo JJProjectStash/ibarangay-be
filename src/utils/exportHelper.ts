@@ -12,7 +12,7 @@ if (!fs.existsSync(exportsDir)) {
 
 export const exportComplaintsToCSV = async (
   complaints: any[],
-  filename: string
+  filename: string,
 ): Promise<string> => {
   const filePath = path.join(exportsDir, `${filename}.csv`);
 
@@ -57,7 +57,7 @@ export const exportComplaintsToCSV = async (
 
 export const exportComplaintsToExcel = async (
   complaints: any[],
-  filename: string
+  filename: string,
 ): Promise<string> => {
   const filePath = path.join(exportsDir, `${filename}.xlsx`);
 

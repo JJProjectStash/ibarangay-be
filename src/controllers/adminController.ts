@@ -1,399 +1,455 @@
-import { Response } from "express";
-import { AuthRequest } from "../types";
+import { Request, Response } from "express";
 import User from "../models/User";
-import Service from "../models/Service";
 import Complaint from "../models/Complaint";
-import Event from "../models/Event";
-import AuditLog from "../models/AuditLog";
+import Service from "../models/Service";
+import bcrypt from "bcryptjs";
 
 /**
- * Get system statistics
+ * Admin Controller
+ * Handles administrative operations for user management and system configuration
  */
-export const getSystemStats = async (
-  _req: AuthRequest,
-  res: Response
-): Promise<void> => {
+
+/**
+ * Get all users with pagination and filtering
+ * @route GET /api/v1/admin/users
+ * @access Admin
+ */
+export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    // User statistics
-    const totalUsers = await User.countDocuments();
-    const totalAdmins = await User.countDocuments({ role: "admin" });
-    const totalStaff = await User.countDocuments({ role: "staff" });
-    const totalResidents = await User.countDocuments({ role: "resident" });
-    const verifiedUsers = await User.countDocuments({ isVerified: true });
-    const unverifiedUsers = await User.countDocuments({ isVerified: false });
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
 
-    // Service statistics
-    const totalServices = await Service.countDocuments();
-    const pendingServices = await Service.countDocuments({ status: "pending" });
-    const approvedServices = await Service.countDocuments({
-      status: "approved",
-    });
-    const borrowedServices = await Service.countDocuments({
-      status: "borrowed",
-    });
-    const returnedServices = await Service.countDocuments({
-      status: "returned",
-    });
-    const rejectedServices = await Service.countDocuments({
-      status: "rejected",
-    });
+    const {
+      role,
+      status,
+      search,
+      sortBy = "createdAt",
+      order = "desc",
+    } = req.query;
 
-    // Complaint statistics
-    const totalComplaints = await Complaint.countDocuments();
-    const pendingComplaints = await Complaint.countDocuments({
-      status: "pending",
-    });
-    const inProgressComplaints = await Complaint.countDocuments({
-      status: "in-progress",
-    });
-    const resolvedComplaints = await Complaint.countDocuments({
-      status: "resolved",
-    });
-    const closedComplaints = await Complaint.countDocuments({
-      status: "closed",
-    });
+    // Build filter
+    const filter: any = {};
+    if (role) filter.role = role;
+    if (status === "active") filter.isActive = true;
+    if (status === "inactive") filter.isActive = false;
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+        { phone: { $regex: search, $options: "i" } },
+      ];
+    }
 
-    // Event statistics
-    const totalEvents = await Event.countDocuments();
-    const upcomingEvents = await Event.countDocuments({
-      date: { $gte: new Date() },
-    });
-    const pastEvents = await Event.countDocuments({
-      date: { $lt: new Date() },
-    });
+    // Build sort
+    const sort: any = {};
+    sort[sortBy as string] = order === "asc" ? 1 : -1;
 
-    // Recent activity (last 30 days)
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const newUsersLast30Days = await User.countDocuments({
-      createdAt: { $gte: thirtyDaysAgo },
-    });
-    const newServicesLast30Days = await Service.countDocuments({
-      createdAt: { $gte: thirtyDaysAgo },
-    });
-    const newComplaintsLast30Days = await Complaint.countDocuments({
-      createdAt: { $gte: thirtyDaysAgo },
-    });
-
-    // Pending approvals
-    const pendingApprovals = pendingServices + pendingComplaints;
-
-    // Average resolution time for complaints (in hours)
-    const resolvedComplaintsWithTime = await Complaint.aggregate([
-      {
-        $match: {
-          status: "resolved",
-          resolvedAt: { $exists: true },
-        },
-      },
-      {
-        $project: {
-          resolutionTime: {
-            $divide: [
-              { $subtract: ["$resolvedAt", "$createdAt"] },
-              1000 * 60 * 60,
-            ],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          avgResolutionTime: { $avg: "$resolutionTime" },
-        },
-      },
+    const [users, total] = await Promise.all([
+      User.find(filter).select("-password").sort(sort).skip(skip).limit(limit),
+      User.countDocuments(filter),
     ]);
 
-    const avgComplaintResolutionTime =
-      resolvedComplaintsWithTime.length > 0
-        ? Math.round(resolvedComplaintsWithTime[0].avgResolutionTime)
-        : 0;
-
-    // Complaint satisfaction rating
-    const complaintRatings = await Complaint.aggregate([
-      {
-        $match: { rating: { $exists: true, $ne: null } },
-      },
-      {
-        $group: {
-          _id: null,
-          avgRating: { $avg: "$rating" },
-          totalRatings: { $sum: 1 },
-        },
-      },
-    ]);
-
-    const avgComplaintRating =
-      complaintRatings.length > 0
-        ? Number(complaintRatings[0].avgRating.toFixed(2))
-        : 0;
-    const totalComplaintRatings =
-      complaintRatings.length > 0 ? complaintRatings[0].totalRatings : 0;
-
-    res.status(200).json({
+    res.json({
       success: true,
-      data: {
-        users: {
-          total: totalUsers,
-          admins: totalAdmins,
-          staff: totalStaff,
-          residents: totalResidents,
-          verified: verifiedUsers,
-          unverified: unverifiedUsers,
-          newLast30Days: newUsersLast30Days,
-        },
-        services: {
-          total: totalServices,
-          pending: pendingServices,
-          approved: approvedServices,
-          borrowed: borrowedServices,
-          returned: returnedServices,
-          rejected: rejectedServices,
-          newLast30Days: newServicesLast30Days,
-        },
-        complaints: {
-          total: totalComplaints,
-          pending: pendingComplaints,
-          inProgress: inProgressComplaints,
-          resolved: resolvedComplaints,
-          closed: closedComplaints,
-          newLast30Days: newComplaintsLast30Days,
-          avgResolutionTime: avgComplaintResolutionTime,
-          avgRating: avgComplaintRating,
-          totalRatings: totalComplaintRatings,
-        },
-        events: {
-          total: totalEvents,
-          upcoming: upcomingEvents,
-          past: pastEvents,
-        },
-        pendingApprovals,
+      data: users,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
       },
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch system statistics",
+      message: "Failed to fetch users",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get user by ID with detailed information
+ * @route GET /api/v1/admin/users/:id
+ * @access Admin
+ */
+export const getUserById = async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Get user statistics
+    const [complaintsCount, servicesCount, eventsRegistered] =
+      await Promise.all([
+        Complaint.countDocuments({ userId: user._id }),
+        Service.countDocuments({ userId: user._id }),
+        // Assuming Event model has registrations array
+        0, // Placeholder
+      ]);
+
+    res.json({
+      success: true,
+      data: {
+        ...user.toObject(),
+        statistics: {
+          complaints: complaintsCount,
+          services: servicesCount,
+          eventsRegistered,
+        },
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch user",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Create new user
+ * @route POST /api/v1/admin/users
+ * @access Admin
+ */
+export const createUser = async (req: Request, res: Response) => {
+  try {
+    const { email, password, name, role, phone, address } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User with this email already exists",
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create user
+    const user = await User.create({
+      email,
+      password: hashedPassword,
+      name,
+      role: role || "resident",
+      phone,
+      address,
+      isVerified: true, // Admin-created users are auto-verified
+      isActive: true,
+    });
+
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      data: userResponse,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to create user",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Update user information
+ * @route PUT /api/v1/admin/users/:id
+ * @access Admin
+ */
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const { password, ...updateData } = req.body;
+
+    // If password is being updated, hash it
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    const user = await User.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "User updated successfully",
+      data: user,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Delete user
+ * @route DELETE /api/v1/admin/users/:id
+ * @access Admin
+ */
+export const deleteUser = async (req: Request, res: Response) => {
+  try {
+    const user = await User.findByIdAndDelete(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "User deleted successfully",
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete user",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Toggle user active status
+ * @route PATCH /api/v1/admin/users/:id/toggle-status
+ * @access Admin
+ */
+export const toggleUserStatus = async (req: Request, res: Response) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.isActive = !user.isActive;
+    await user.save();
+
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    res.json({
+      success: true,
+      message: `User ${user.isActive ? "activated" : "deactivated"} successfully`,
+      data: userResponse,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle user status",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Verify user account
+ * @route PATCH /api/v1/admin/users/:id/verify
+ * @access Admin
+ */
+export const verifyUser = async (req: Request, res: Response) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isVerified: true },
+      { new: true },
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "User verified successfully",
+      data: user,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to verify user",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Assign role to user
+ * @route PATCH /api/v1/admin/users/:id/role
+ * @access Admin
+ */
+export const assignRole = async (req: Request, res: Response) => {
+  try {
+    const { role } = req.body;
+
+    if (!["resident", "staff", "admin"].includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role",
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true },
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Role assigned successfully",
+      data: user,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign role",
+      error: error.message,
     });
   }
 };
 
 /**
  * Get audit logs
+ * @route GET /api/v1/admin/audit-logs
+ * @access Admin
  */
-export const getAuditLogs = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const getAuditLogs = async (req: Request, res: Response) => {
   try {
-    const {
-      action,
-      targetType,
-      userId,
-      startDate,
-      endDate,
-      page = 1,
-      limit = 50,
-    } = req.query;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const skip = (page - 1) * limit;
 
-    const query: any = {};
+    // This is a placeholder - you would need to implement an AuditLog model
+    // For now, returning recent activities from various models
+    const [complaints, services] = await Promise.all([
+      Complaint.find()
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .populate("userId", "name email")
+        .populate("assignedTo", "name email")
+        .select("title status category updatedAt"),
+      Service.find()
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .populate("userId", "name email")
+        .populate("assignedTo", "name email")
+        .select("title status category updatedAt"),
+    ]);
 
-    if (action) {
-      query.action = action;
-    }
+    const logs = [
+      ...complaints.map((c) => ({
+        type: "complaint",
+        action: "updated",
+        entity: c.title,
+        status: c.status,
+        user: c.userId,
+        assignedTo: c.assignedTo,
+        timestamp: c.updatedAt,
+      })),
+      ...services.map((s) => ({
+        type: "service",
+        action: "updated",
+        entity: s.title,
+        status: s.status,
+        user: s.userId,
+        assignedTo: s.assignedTo,
+        timestamp: s.updatedAt,
+      })),
+    ]
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      )
+      .slice(skip, skip + limit);
 
-    if (targetType) {
-      query.targetType = targetType;
-    }
-
-    if (userId) {
-      query.userId = userId;
-    }
-
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) {
-        query.createdAt.$gte = new Date(startDate as string);
-      }
-      if (endDate) {
-        query.createdAt.$lte = new Date(endDate as string);
-      }
-    }
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const skip = (pageNum - 1) * limitNum;
-
-    const total = await AuditLog.countDocuments(query);
-    const logs = await AuditLog.find(query)
-      .populate("userId", "firstName lastName email role")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum);
-
-    res.status(200).json({
+    res.json({
       success: true,
       data: logs,
       pagination: {
-        total,
-        page: pageNum,
-        pages: Math.ceil(total / limitNum),
-        limit: limitNum,
+        page,
+        limit,
+        total: logs.length,
+        pages: Math.ceil(logs.length / limit),
       },
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch audit logs",
+      message: "Failed to fetch audit logs",
+      error: error.message,
     });
   }
 };
 
 /**
- * Create audit log entry
+ * Bulk update users
+ * @route POST /api/v1/admin/users/bulk-update
+ * @access Admin
  */
-export const createAuditLog = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const bulkUpdateUsers = async (req: Request, res: Response) => {
   try {
-    const { action, targetType, targetId, details } = req.body;
+    const { userIds, updates } = req.body;
 
-    if (!action || !targetType) {
-      res.status(400).json({
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Action and target type are required",
+        message: "User IDs array is required",
       });
-      return;
     }
 
-    const user = await User.findById(req.user?.id);
-    if (!user) {
-      res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-      return;
-    }
+    const result = await User.updateMany({ _id: { $in: userIds } }, updates);
 
-    const auditLog = await AuditLog.create({
-      userId: req.user?.id,
-      userName: `${user.firstName} ${user.lastName}`,
-      action,
-      targetType,
-      targetId: targetId || undefined,
-      details: details || {},
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent"),
-    });
-
-    res.status(201).json({
+    res.json({
       success: true,
-      message: "Audit log created successfully",
-      data: auditLog,
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to create audit log",
-    });
-  }
-};
-
-/**
- * Get audit log statistics
- */
-export const getAuditLogStats = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const { startDate, endDate } = req.query;
-
-    const matchQuery: any = {};
-    if (startDate || endDate) {
-      matchQuery.createdAt = {};
-      if (startDate) {
-        matchQuery.createdAt.$gte = new Date(startDate as string);
-      }
-      if (endDate) {
-        matchQuery.createdAt.$lte = new Date(endDate as string);
-      }
-    }
-
-    const stats = await AuditLog.aggregate([
-      { $match: matchQuery },
-      {
-        $facet: {
-          byAction: [
-            { $group: { _id: "$action", count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-          ],
-          byTargetType: [
-            { $group: { _id: "$targetType", count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-          ],
-          byUser: [
-            {
-              $group: {
-                _id: { userId: "$userId", userName: "$userName" },
-                count: { $sum: 1 },
-              },
-            },
-            { $sort: { count: -1 } },
-            { $limit: 10 },
-          ],
-          total: [{ $count: "count" }],
-        },
-      },
-    ]);
-
-    res.status(200).json({
-      success: true,
+      message: `${result.modifiedCount} users updated successfully`,
       data: {
-        byAction: stats[0].byAction,
-        byTargetType: stats[0].byTargetType,
-        topUsers: stats[0].byUser,
-        total: stats[0].total[0]?.count || 0,
+        matched: result.matchedCount,
+        modified: result.modifiedCount,
       },
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch audit log statistics",
-    });
-  }
-};
-
-/**
- * Delete old audit logs
- */
-export const deleteOldAuditLogs = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const { daysOld = 90 } = req.query;
-
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - parseInt(daysOld as string));
-
-    const result = await AuditLog.deleteMany({
-      createdAt: { $lt: cutoffDate },
-    });
-
-    res.status(200).json({
-      success: true,
-      message: `Deleted ${result.deletedCount} audit logs older than ${daysOld} days`,
-      data: {
-        deletedCount: result.deletedCount,
-      },
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to delete old audit logs",
+      message: "Failed to bulk update users",
+      error: error.message,
     });
   }
 };

@@ -36,7 +36,7 @@ export const connectDatabase = async (retryCount = 0): Promise<void> => {
 
     if (retryCount < MAX_RETRIES) {
       console.log(
-        `🔄 Retrying connection... (Attempt ${retryCount + 1}/${MAX_RETRIES})`
+        `🔄 Retrying connection... (Attempt ${retryCount + 1}/${MAX_RETRIES})`,
       );
       await new Promise((resolve) => setTimeout(resolve, RETRY_INTERVAL));
       return connectDatabase(retryCount + 1);

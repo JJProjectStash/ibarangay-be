@@ -1,40 +1,141 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import Announcement from "../models/Announcement";
-import Notification from "../models/Notification";
-import User from "../models/User";
-import { AuthRequest } from "../types";
-import { NotFoundError, ForbiddenError } from "../utils/AppError";
-import { emitToAll } from "../config/socket";
+import { broadcastToAll } from "../websocket/websocketServer";
 
 /**
- * Create a new announcement
+ * Announcement Controller
+ * Handles CRUD operations for announcements
  */
-export const createAnnouncement = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const {
-      title,
-      content,
-      category,
-      priority,
-      imageUrl,
-      attachments,
-      expiresAt,
-    } = req.body;
 
-    const announcement = await Announcement.create({
-      title,
-      content,
-      category,
-      priority: priority || "medium",
-      author: req.user?.id,
-      imageUrl,
-      attachments,
-      expiresAt,
-      isPublished: false,
+/**
+ * Get all announcements with pagination and filtering
+ * @route GET /api/v1/announcements
+ * @access Public (published only), Admin/Staff (all)
+ */
+export const getAnnouncements = async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    const { category, priority, search } = req.query;
+    const user = (req as any).user;
+
+    // Build filter
+    const filter: any = {};
+
+    // Non-admin users can only see published announcements
+    if (!user || (user.role !== "admin" && user.role !== "staff")) {
+      filter.isPublished = true;
+    }
+
+    if (category) filter.category = category;
+    if (priority) filter.priority = priority;
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { content: { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const [announcements, total] = await Promise.all([
+      Announcement.find(filter)
+        .sort({ isPinned: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("createdBy", "name email"),
+      Announcement.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: announcements,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
     });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch announcements",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get single announcement by ID
+ * @route GET /api/v1/announcements/:id
+ * @access Public (if published), Admin/Staff (all)
+ */
+export const getAnnouncementById = async (req: Request, res: Response) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id).populate(
+      "createdBy",
+      "name email",
+    );
+
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        message: "Announcement not found",
+      });
+    }
+
+    const user = (req as any).user;
+    if (
+      !announcement.isPublished &&
+      (!user || (user.role !== "admin" && user.role !== "staff"))
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    // Increment view count
+    announcement.views += 1;
+    await announcement.save();
+
+    res.json({
+      success: true,
+      data: announcement,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch announcement",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Create new announcement
+ * @route POST /api/v1/announcements
+ * @access Admin, Staff
+ */
+export const createAnnouncement = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const announcementData = {
+      ...req.body,
+      createdBy: user.id,
+    };
+
+    const announcement = await Announcement.create(announcementData);
+    await announcement.populate("createdBy", "name email");
+
+    // Broadcast to all connected clients if published
+    if (announcement.isPublished) {
+      broadcastToAll({
+        type: "NEW_ANNOUNCEMENT",
+        data: announcement,
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -44,324 +145,164 @@ export const createAnnouncement = async (
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to create announcement",
-    });
-  }
-};
-
-/**
- * Get all announcements (with filters)
- */
-export const getAnnouncements = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const { category, priority, isPublished } = req.query;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const skip = (page - 1) * limit;
-
-    const query: any = {};
-
-    // Only show published announcements to residents
-    if (req.user?.role === "resident") {
-      query.isPublished = true;
-      query.$or = [
-        { expiresAt: { $exists: false } },
-        { expiresAt: { $gte: new Date() } },
-      ];
-    } else {
-      // Admin/staff can see all or filter by published status
-      if (isPublished !== undefined) {
-        query.isPublished = isPublished === "true";
-      }
-    }
-
-    if (category) {
-      query.category = category;
-    }
-
-    if (priority) {
-      query.priority = priority;
-    }
-
-    const total = await Announcement.countDocuments(query);
-    const announcements = await Announcement.find(query)
-      .populate("author", "firstName lastName role")
-      .sort({ priority: -1, publishedAt: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    res.status(200).json({
-      success: true,
-      data: announcements,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit),
-        limit,
-      },
-    });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      message: error.message || "Failed to fetch announcements",
-    });
-  }
-};
-
-/**
- * Get announcement by ID
- */
-export const getAnnouncementById = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const announcement = await Announcement.findById(req.params.id).populate(
-      "author",
-      "firstName lastName role email"
-    );
-
-    if (!announcement) {
-      throw new NotFoundError("Announcement not found");
-    }
-
-    // Check if user can view unpublished announcements
-    if (!announcement.isPublished && req.user?.role === "resident") {
-      throw new ForbiddenError("This announcement is not available");
-    }
-
-    // Increment views
-    announcement.views += 1;
-    await announcement.save();
-
-    res.status(200).json({
-      success: true,
-      data: announcement,
-    });
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to fetch announcement",
+      message: "Failed to create announcement",
+      error: error.message,
     });
   }
 };
 
 /**
  * Update announcement
+ * @route PUT /api/v1/announcements/:id
+ * @access Admin, Staff
  */
-export const updateAnnouncement = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const updateAnnouncement = async (req: Request, res: Response) => {
   try {
-    const announcement = await Announcement.findById(req.params.id);
-
-    if (!announcement) {
-      throw new NotFoundError("Announcement not found");
-    }
-
-    // Check authorization
-    if (
-      announcement.author.toString() !== req.user?.id &&
-      req.user?.role !== "admin"
-    ) {
-      throw new ForbiddenError("Not authorized to update this announcement");
-    }
-
-    const updatedAnnouncement = await Announcement.findByIdAndUpdate(
+    const announcement = await Announcement.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true }
-    ).populate("author", "firstName lastName role");
+      { new: true, runValidators: true },
+    ).populate("createdBy", "name email");
 
-    res.status(200).json({
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        message: "Announcement not found",
+      });
+    }
+
+    // Broadcast update if published
+    if (announcement.isPublished) {
+      broadcastToAll({
+        type: "ANNOUNCEMENT_UPDATED",
+        data: announcement,
+      });
+    }
+
+    res.json({
       success: true,
       message: "Announcement updated successfully",
-      data: updatedAnnouncement,
-    });
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to update announcement",
-    });
-  }
-};
-
-/**
- * Publish announcement
- */
-export const publishAnnouncement = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const announcement = await Announcement.findById(req.params.id);
-
-    if (!announcement) {
-      throw new NotFoundError("Announcement not found");
-    }
-
-    if (announcement.isPublished) {
-      res.status(400).json({
-        success: false,
-        message: "Announcement is already published",
-      });
-      return;
-    }
-
-    announcement.isPublished = true;
-    announcement.publishedAt = new Date();
-    await announcement.save();
-
-    // Notify all residents
-    const residents = await User.find({ role: "resident" });
-
-    for (const resident of residents) {
-      await Notification.create({
-        userId: resident._id,
-        title: "New Announcement",
-        message: `New ${announcement.priority} priority announcement: ${announcement.title}`,
-        type: announcement.priority === "urgent" ? "warning" : "info",
-        relatedId: announcement._id,
-        relatedType: "announcement" as any,
-      });
-    }
-
-    // Real-time notification
-    emitToAll("announcement:new", {
-      announcementId: announcement._id,
-      title: announcement.title,
-      category: announcement.category,
-      priority: announcement.priority,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: "Announcement published successfully",
       data: announcement,
     });
   } catch (error: any) {
-    res.status(error.statusCode || 500).json({
+    res.status(500).json({
       success: false,
-      message: error.message || "Failed to publish announcement",
-    });
-  }
-};
-
-/**
- * Unpublish announcement
- */
-export const unpublishAnnouncement = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
-  try {
-    const announcement = await Announcement.findById(req.params.id);
-
-    if (!announcement) {
-      throw new NotFoundError("Announcement not found");
-    }
-
-    if (!announcement.isPublished) {
-      res.status(400).json({
-        success: false,
-        message: "Announcement is not published",
-      });
-      return;
-    }
-
-    announcement.isPublished = false;
-    await announcement.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Announcement unpublished successfully",
-      data: announcement,
-    });
-  } catch (error: any) {
-    res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to unpublish announcement",
+      message: "Failed to update announcement",
+      error: error.message,
     });
   }
 };
 
 /**
  * Delete announcement
+ * @route DELETE /api/v1/announcements/:id
+ * @access Admin
  */
-export const deleteAnnouncement = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const deleteAnnouncement = async (req: Request, res: Response) => {
   try {
-    const announcement = await Announcement.findById(req.params.id);
+    const announcement = await Announcement.findByIdAndDelete(req.params.id);
 
     if (!announcement) {
-      throw new NotFoundError("Announcement not found");
+      return res.status(404).json({
+        success: false,
+        message: "Announcement not found",
+      });
     }
 
-    // Check authorization
-    if (
-      announcement.author.toString() !== req.user?.id &&
-      req.user?.role !== "admin"
-    ) {
-      throw new ForbiddenError("Not authorized to delete this announcement");
-    }
+    // Broadcast deletion
+    broadcastToAll({
+      type: "ANNOUNCEMENT_DELETED",
+      data: { id: req.params.id },
+    });
 
-    await announcement.deleteOne();
-
-    res.status(200).json({
+    res.json({
       success: true,
       message: "Announcement deleted successfully",
     });
   } catch (error: any) {
-    res.status(error.statusCode || 500).json({
+    res.status(500).json({
       success: false,
-      message: error.message || "Failed to delete announcement",
+      message: "Failed to delete announcement",
+      error: error.message,
     });
   }
 };
 
 /**
- * Get announcement statistics
+ * Publish/Unpublish announcement
+ * @route PATCH /api/v1/announcements/:id/publish
+ * @access Admin, Staff
  */
-export const getAnnouncementStats = async (
-  _req: AuthRequest,
-  res: Response
-): Promise<void> => {
+export const togglePublishAnnouncement = async (
+  req: Request,
+  res: Response,
+) => {
   try {
-    const stats = await Announcement.aggregate([
-      {
-        $facet: {
-          byCategory: [
-            { $group: { _id: "$category", count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-          ],
-          byPriority: [{ $group: { _id: "$priority", count: { $sum: 1 } } }],
-          published: [{ $match: { isPublished: true } }, { $count: "count" }],
-          draft: [{ $match: { isPublished: false } }, { $count: "count" }],
-          totalViews: [{ $group: { _id: null, total: { $sum: "$views" } } }],
-        },
-      },
-    ]);
+    const announcement = await Announcement.findById(req.params.id);
 
-    res.status(200).json({
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        message: "Announcement not found",
+      });
+    }
+
+    announcement.isPublished = !announcement.isPublished;
+    await announcement.save();
+    await announcement.populate("createdBy", "name email");
+
+    // Broadcast status change
+    broadcastToAll({
+      type: announcement.isPublished
+        ? "ANNOUNCEMENT_PUBLISHED"
+        : "ANNOUNCEMENT_UNPUBLISHED",
+      data: announcement,
+    });
+
+    res.json({
       success: true,
-      data: {
-        byCategory: stats[0].byCategory,
-        byPriority: stats[0].byPriority,
-        published: stats[0].published[0]?.count || 0,
-        draft: stats[0].draft[0]?.count || 0,
-        totalViews: stats[0].totalViews[0]?.total || 0,
-      },
+      message: `Announcement ${announcement.isPublished ? "published" : "unpublished"} successfully`,
+      data: announcement,
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch statistics",
+      message: "Failed to toggle announcement status",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Pin/Unpin announcement
+ * @route PATCH /api/v1/announcements/:id/pin
+ * @access Admin, Staff
+ */
+export const togglePinAnnouncement = async (req: Request, res: Response) => {
+  try {
+    const announcement = await Announcement.findById(req.params.id);
+
+    if (!announcement) {
+      return res.status(404).json({
+        success: false,
+        message: "Announcement not found",
+      });
+    }
+
+    announcement.isPinned = !announcement.isPinned;
+    await announcement.save();
+    await announcement.populate("createdBy", "name email");
+
+    res.json({
+      success: true,
+      message: `Announcement ${announcement.isPinned ? "pinned" : "unpinned"} successfully`,
+      data: announcement,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to toggle pin status",
+      error: error.message,
     });
   }
 };

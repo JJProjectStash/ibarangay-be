@@ -23,14 +23,14 @@ router.post(
   authenticate,
   complaintValidation,
   validateComplaintCategory,
-  createComplaint
+  createComplaint,
 );
 router.get("/", authenticate, getComplaints);
 router.get(
   "/stats",
   authenticate,
   authorize("admin", "staff"),
-  getComplaintStats
+  getComplaintStats,
 );
 router.get("/:id", authenticate, idValidation, getComplaintById);
 
@@ -46,7 +46,7 @@ router.put(
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  updateComplaintStatus
+  updateComplaintStatus,
 );
 
 router.put(
@@ -54,7 +54,7 @@ router.put(
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  assignComplaint
+  assignComplaint,
 );
 
 router.post(
@@ -62,7 +62,7 @@ router.post(
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  escalateComplaint
+  escalateComplaint,
 );
 
 router.delete("/:id", authenticate, idValidation, deleteComplaint);

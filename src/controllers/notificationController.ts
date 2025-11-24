@@ -4,7 +4,7 @@ import { AuthRequest } from "../types";
 
 export const getNotifications = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { isRead } = req.query;
@@ -40,7 +40,7 @@ export const getNotifications = async (
 
 export const markAsRead = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const notification = await Notification.findOne({
@@ -74,12 +74,12 @@ export const markAsRead = async (
 
 export const markAllAsRead = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     await Notification.updateMany(
       { userId: req.user?.id, isRead: false },
-      { isRead: true }
+      { isRead: true },
     );
 
     res.status(200).json({
@@ -96,7 +96,7 @@ export const markAllAsRead = async (
 
 export const deleteNotification = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const notification = await Notification.findOne({

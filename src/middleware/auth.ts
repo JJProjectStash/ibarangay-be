@@ -10,7 +10,7 @@ import User from "../models/User";
 export const authenticate = async (
   req: AuthRequest,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     // Extract token from Authorization header
@@ -70,7 +70,7 @@ export const authorize = (...roles: string[]) => {
 
     if (!roles.includes(req.user.role)) {
       throw new ForbiddenError(
-        `Access denied. Required role(s): ${roles.join(", ")}`
+        `Access denied. Required role(s): ${roles.join(", ")}`,
       );
     }
 
@@ -84,7 +84,7 @@ export const authorize = (...roles: string[]) => {
 export const optionalAuth = async (
   req: AuthRequest,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const authHeader = req.header("Authorization");
@@ -116,7 +116,7 @@ export const verifyOwnership = (resourceUserIdField: string = "userId") => {
   return async (
     req: AuthRequest,
     _res: Response,
-    next: NextFunction
+    next: NextFunction,
   ): Promise<void> => {
     try {
       if (!req.user) {
@@ -134,7 +134,7 @@ export const verifyOwnership = (resourceUserIdField: string = "userId") => {
 
       if (resourceUserId && resourceUserId !== req.user.id) {
         throw new ForbiddenError(
-          "You do not have permission to access this resource."
+          "You do not have permission to access this resource.",
         );
       }
 

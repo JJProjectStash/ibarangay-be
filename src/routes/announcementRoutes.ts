@@ -1,72 +1,46 @@
-import { Router } from "express";
+import express from "express";
 import {
-  createAnnouncement,
   getAnnouncements,
   getAnnouncementById,
+  createAnnouncement,
   updateAnnouncement,
-  publishAnnouncement,
-  unpublishAnnouncement,
   deleteAnnouncement,
-  getAnnouncementStats,
+  togglePublishAnnouncement,
+  togglePinAnnouncement,
 } from "../controllers/announcementController";
-import { authenticate, authorize } from "../middleware/auth";
-import {
-  announcementValidation,
-  idValidation,
-  queryValidation,
-} from "../middleware/validation";
+import { authenticate, authorize } from "../middleware/security";
 
-const router = Router();
+const router = express.Router();
 
-// Public routes (with optional auth)
-router.get("/", authenticate, queryValidation, getAnnouncements);
-router.get(
-  "/stats",
-  authenticate,
-  authorize("admin", "staff"),
-  getAnnouncementStats
-);
-router.get("/:id", authenticate, idValidation, getAnnouncementById);
+// Public routes (published announcements only)
+router.get("/", getAnnouncements);
+router.get("/:id", getAnnouncementById);
 
-// Protected routes (admin/staff only)
+// Protected routes - Admin and Staff only
 router.post(
   "/",
   authenticate,
-  authorize("admin", "staff"),
-  announcementValidation,
-  createAnnouncement
+  authorize(["admin", "staff"]),
+  createAnnouncement,
 );
-
 router.put(
   "/:id",
   authenticate,
-  authorize("admin", "staff"),
-  idValidation,
-  updateAnnouncement
+  authorize(["admin", "staff"]),
+  updateAnnouncement,
 );
-
+router.delete("/:id", authenticate, authorize(["admin"]), deleteAnnouncement);
 router.patch(
   "/:id/publish",
   authenticate,
-  authorize("admin", "staff"),
-  idValidation,
-  publishAnnouncement
+  authorize(["admin", "staff"]),
+  togglePublishAnnouncement,
 );
-
 router.patch(
-  "/:id/unpublish",
+  "/:id/pin",
   authenticate,
-  authorize("admin", "staff"),
-  idValidation,
-  unpublishAnnouncement
-);
-
-router.delete(
-  "/:id",
-  authenticate,
-  authorize("admin", "staff"),
-  idValidation,
-  deleteAnnouncement
+  authorize(["admin", "staff"]),
+  togglePinAnnouncement,
 );
 
 export default router;

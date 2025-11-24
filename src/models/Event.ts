@@ -49,7 +49,7 @@ const eventSchema = new Schema<IEvent>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes

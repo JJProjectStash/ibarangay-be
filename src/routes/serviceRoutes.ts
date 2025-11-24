@@ -22,7 +22,7 @@ router.post(
   authenticate,
   serviceRequestValidation,
   validateServiceItemType,
-  createServiceRequest
+  createServiceRequest,
 );
 router.get("/", authenticate, getServiceRequests);
 router.get("/:id", authenticate, idValidation, getServiceRequestById);
@@ -31,21 +31,21 @@ router.put(
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  updateServiceStatus
+  updateServiceStatus,
 );
 router.put(
   "/:id/approve",
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  approveServiceRequest
+  approveServiceRequest,
 );
 router.put(
   "/:id/reject",
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  rejectServiceRequest
+  rejectServiceRequest,
 );
 router.delete("/:id", authenticate, idValidation, deleteServiceRequest);
 

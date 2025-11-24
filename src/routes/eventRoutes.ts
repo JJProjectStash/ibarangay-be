@@ -20,7 +20,7 @@ router.post(
   authenticate,
   authorize("admin", "staff"),
   eventValidation,
-  createEvent
+  createEvent,
 );
 router.get("/", authenticate, getEvents);
 router.get("/:id", authenticate, idValidation, getEventById);
@@ -30,7 +30,7 @@ router.get(
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  exportEventAttendees
+  exportEventAttendees,
 );
 router.post("/:id/register", authenticate, idValidation, registerForEvent);
 router.post("/:id/unregister", authenticate, idValidation, unregisterFromEvent);
@@ -39,14 +39,14 @@ router.put(
   authenticate,
   authorize("admin", "staff"),
   idValidation,
-  updateEvent
+  updateEvent,
 );
 router.delete(
   "/:id",
   authenticate,
   authorize("admin"),
   idValidation,
-  deleteEvent
+  deleteEvent,
 );
 
 export default router;

@@ -43,12 +43,12 @@ const generateRefreshToken = (id: string): string => {
  */
 export const getCsrfToken = async (
   _req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     // Generate a random CSRF token
     const csrfToken = crypto.randomBytes(32).toString("hex");
-    
+
     res.status(200).json({
       success: true,
       data: {
@@ -172,7 +172,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
  */
 export const getProfile = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const user = await User.findById(req.user?.id);
@@ -209,7 +209,7 @@ export const getProfile = async (
  */
 export const updateProfile = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { firstName, lastName, address, phoneNumber } = req.body;
@@ -217,7 +217,7 @@ export const updateProfile = async (
     const user = await User.findByIdAndUpdate(
       req.user?.id,
       { firstName, lastName, address, phoneNumber },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!user) {
@@ -251,7 +251,7 @@ export const updateProfile = async (
  */
 export const changePassword = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -289,7 +289,7 @@ export const changePassword = async (
  */
 export const refreshToken = async (
   req: Request,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { refreshToken } = req.body;
@@ -346,7 +346,7 @@ export const refreshToken = async (
  */
 export const getAllUsers = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { role, isVerified, search } = req.query;
@@ -403,7 +403,7 @@ export const getAllUsers = async (
  */
 export const updateUserRole = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { role } = req.body;
@@ -416,7 +416,7 @@ export const updateUserRole = async (
     const user = await User.findByIdAndUpdate(
       id,
       { role },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).select("-password");
 
     if (!user) {
@@ -456,7 +456,7 @@ export const updateUserRole = async (
  */
 export const verifyUser = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -464,7 +464,7 @@ export const verifyUser = async (
     const user = await User.findByIdAndUpdate(
       id,
       { isVerified: true },
-      { new: true }
+      { new: true },
     ).select("-password");
 
     if (!user) {
@@ -489,7 +489,7 @@ export const verifyUser = async (
  */
 export const deleteUser = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { id } = req.params;
@@ -537,7 +537,7 @@ export const deleteUser = async (
  */
 export const createStaffAdmin = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { firstName, lastName, email, password, address, phoneNumber, role } =

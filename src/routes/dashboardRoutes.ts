@@ -1,18 +1,35 @@
-import { Router } from "express";
+import express from "express";
 import {
   getDashboardStats,
-  getUserDashboard,
+  getRecentActivities,
+  getTimeSeriesData,
+  getCategoryDistribution,
+  getStaffPerformance,
 } from "../controllers/dashboardController";
-import { authenticate, authorize } from "../middleware/auth";
+import { authenticate, authorize } from "../middleware/security";
 
-const router = Router();
+const router = express.Router();
 
+// All dashboard routes require authentication
+router.use(authenticate);
+
+// Dashboard statistics - Admin and Staff only
+router.get("/stats", authorize(["admin", "staff"]), getDashboardStats);
+
+// Recent activities - Admin and Staff only
+router.get("/activities", authorize(["admin", "staff"]), getRecentActivities);
+
+// Time-series data for charts - Admin and Staff only
+router.get("/time-series", authorize(["admin", "staff"]), getTimeSeriesData);
+
+// Category distribution - Admin and Staff only
 router.get(
-  "/stats",
-  authenticate,
-  authorize("admin", "staff"),
-  getDashboardStats
+  "/category-distribution",
+  authorize(["admin", "staff"]),
+  getCategoryDistribution,
 );
-router.get("/user", authenticate, getUserDashboard);
+
+// Staff performance - Admin only
+router.get("/staff-performance", authorize(["admin"]), getStaffPerformance);
 
 export default router;

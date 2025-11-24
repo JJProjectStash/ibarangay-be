@@ -36,7 +36,7 @@ const notificationSchema = new Schema<INotification>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes
@@ -45,5 +45,5 @@ notificationSchema.index({ createdAt: -1 });
 
 export default mongoose.model<INotification>(
   "Notification",
-  notificationSchema
+  notificationSchema,
 );

@@ -33,7 +33,7 @@ const storage = multer.diskStorage({
 const fileFilter = (
   _req: Request,
   file: Express.Multer.File,
-  cb: FileFilterCallback
+  cb: FileFilterCallback,
 ) => {
   // Allowed file types
   const allowedMimes = [
@@ -52,8 +52,8 @@ const fileFilter = (
   } else {
     cb(
       new Error(
-        "Invalid file type. Only JPEG, PNG, GIF, WebP, PDF, and DOC files are allowed."
-      )
+        "Invalid file type. Only JPEG, PNG, GIF, WebP, PDF, and DOC files are allowed.",
+      ),
     );
   }
 };
@@ -71,7 +71,7 @@ export const upload = multer({
 export const optimizeImage = async (
   req: Request,
   _res: any,
-  next: any
+  next: any,
 ): Promise<void> => {
   if (!req.file || !req.file.mimetype.startsWith("image/")) {
     return next();
@@ -81,7 +81,7 @@ export const optimizeImage = async (
     const filePath = req.file.path;
     const optimizedPath = filePath.replace(
       path.extname(filePath),
-      "-optimized" + path.extname(filePath)
+      "-optimized" + path.extname(filePath),
     );
 
     await sharp(filePath)

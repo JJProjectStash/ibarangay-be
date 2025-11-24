@@ -1,35 +1,36 @@
-import { Router } from "express";
+import express from "express";
 import {
-  getSystemStats,
+  getAllUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+  toggleUserStatus,
+  verifyUser,
+  assignRole,
   getAuditLogs,
-  createAuditLog,
-  getAuditLogStats,
-  deleteOldAuditLogs,
+  bulkUpdateUsers,
 } from "../controllers/adminController";
-import { authenticate, authorize } from "../middleware/auth";
-import { auditLogMiddleware } from "../middleware/auditLog";
+import { authenticate, authorize } from "../middleware/security";
 
-const router = Router();
+const router = express.Router();
 
-// All routes require authentication and admin role
+// All admin routes require authentication and admin role
 router.use(authenticate);
-router.use(authorize("admin"));
+router.use(authorize(["admin"]));
 
-// System statistics
-router.get("/stats", getSystemStats);
+// User management routes
+router.get("/users", getAllUsers);
+router.get("/users/:id", getUserById);
+router.post("/users", createUser);
+router.put("/users/:id", updateUser);
+router.delete("/users/:id", deleteUser);
+router.patch("/users/:id/toggle-status", toggleUserStatus);
+router.patch("/users/:id/verify", verifyUser);
+router.patch("/users/:id/role", assignRole);
+router.post("/users/bulk-update", bulkUpdateUsers);
 
 // Audit logs
 router.get("/audit-logs", getAuditLogs);
-router.post(
-  "/audit-logs",
-  auditLogMiddleware("manual_log_creation"),
-  createAuditLog
-);
-router.get("/audit-logs/stats", getAuditLogStats);
-router.delete(
-  "/audit-logs/cleanup",
-  auditLogMiddleware("audit_log_cleanup"),
-  deleteOldAuditLogs
-);
 
 export default router;

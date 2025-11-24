@@ -4,7 +4,7 @@ import { AuthRequest } from "../types";
 
 export const getTimeSeriesData = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { period = "daily", days = 30 } = req.query;
@@ -72,7 +72,7 @@ export const getTimeSeriesData = async (
 
 export const getStaffPerformance = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { startDate, endDate } = req.query;
@@ -155,7 +155,7 @@ export const getStaffPerformance = async (
 
 export const getCategoryAnalytics = async (
   _req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const categoryStats = await Complaint.aggregate([
@@ -223,7 +223,7 @@ export const getCategoryAnalytics = async (
 
 export const getResponseTimeAnalytics = async (
   _req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const responseTimeStats = await Complaint.aggregate([
@@ -286,7 +286,7 @@ export const getResponseTimeAnalytics = async (
 
 export const getTrendAnalysis = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { days = 30 } = req.query;
@@ -357,7 +357,7 @@ export const getTrendAnalysis = async (
 
 export const getMonthlyReport = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { year, month } = req.query;

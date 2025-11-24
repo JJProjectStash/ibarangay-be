@@ -50,7 +50,7 @@ const autoAssignComplaint = async (complaintId: string, category: string) => {
 
 export const createComplaint = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { title, description, category, priority, attachments } = req.body;
@@ -109,7 +109,7 @@ export const createComplaint = async (
 
 export const getComplaints = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { status, priority, category, assignedTo } = req.query;
@@ -149,7 +149,7 @@ export const getComplaints = async (
 
 export const getComplaintById = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const complaint = await Complaint.findById(req.params.id)
@@ -193,7 +193,7 @@ export const getComplaintById = async (
 
 export const updateComplaintStatus = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { status, response } = req.body;
@@ -235,7 +235,7 @@ export const updateComplaintStatus = async (
     const updatedComplaint = await Complaint.findByIdAndUpdate(
       req.params.id,
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     // Create notification for user
@@ -284,7 +284,7 @@ export const updateComplaintStatus = async (
 
 export const assignComplaint = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { staffId } = req.body;
@@ -311,7 +311,7 @@ export const assignComplaint = async (
           },
         },
       },
-      { new: true }
+      { new: true },
     );
 
     if (!complaint) {
@@ -353,7 +353,7 @@ export const assignComplaint = async (
 
 export const addComment = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { message, isInternal } = req.body;
@@ -376,7 +376,7 @@ export const addComment = async (
           },
         },
       },
-      { new: true }
+      { new: true },
     ).populate("comments.userId", "firstName lastName");
 
     if (!complaint) {
@@ -430,7 +430,7 @@ export const addComment = async (
 
 export const rateComplaint = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { rating, feedback } = req.body;
@@ -507,7 +507,7 @@ export const rateComplaint = async (
 
 export const escalateComplaint = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const complaint = await Complaint.findById(req.params.id);
@@ -567,7 +567,7 @@ export const escalateComplaint = async (
 
 export const deleteComplaint = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const complaint = await Complaint.findById(req.params.id);
@@ -608,7 +608,7 @@ export const deleteComplaint = async (
 
 export const getComplaintStats = async (
   _req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const stats = await Complaint.aggregate([

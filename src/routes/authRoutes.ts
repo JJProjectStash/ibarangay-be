@@ -39,7 +39,7 @@ router.put(
   "/change-password",
   authenticate,
   changePasswordValidation,
-  changePassword
+  changePassword,
 );
 
 // Admin only routes
@@ -48,35 +48,35 @@ router.get(
   authenticate,
   authorize("admin"),
   queryValidation,
-  getAllUsers
+  getAllUsers,
 );
 router.post(
   "/users/staff-admin",
   authenticate,
   authorize("admin"),
   registerValidation,
-  createStaffAdmin
+  createStaffAdmin,
 );
 router.put(
   "/users/:id/role",
   authenticate,
   authorize("admin"),
   idValidation,
-  updateUserRole
+  updateUserRole,
 );
 router.patch(
   "/users/:id/verify",
   authenticate,
   authorize("admin"),
   idValidation,
-  verifyUser
+  verifyUser,
 );
 router.delete(
   "/users/:id",
   authenticate,
   authorize("admin"),
   idValidation,
-  deleteUser
+  deleteUser,
 );
 
 export default router;

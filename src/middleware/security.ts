@@ -7,7 +7,7 @@ import { AuthRequest } from "../types";
 export const sanitizeInput = (
   req: Request,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   const sanitize = (obj: Record<string, any>): Record<string, any> => {
     const sanitized: Record<string, any> = {};
@@ -46,7 +46,7 @@ export const sanitizeInput = (
 export const preventParameterPollution = (
   req: Request,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   // Ensure query parameters are not arrays (except for allowed ones)
   const allowedArrayParams = ["status", "category", "priority"];
@@ -66,7 +66,7 @@ export const preventParameterPollution = (
 export const securityHeaders = (
   _req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   // Prevent clickjacking
   res.setHeader("X-Frame-Options", "DENY");
@@ -89,7 +89,7 @@ export const securityHeaders = (
 export const requestId = (
   req: AuthRequest,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   req.id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   next();

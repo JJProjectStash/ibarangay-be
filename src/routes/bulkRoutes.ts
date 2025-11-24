@@ -1,41 +1,49 @@
-import { Router } from "express";
+import express from "express";
 import {
-  bulkUpdateStatus,
-  bulkAssign,
-  bulkDelete,
+  bulkUpdateComplaintsStatus,
+  bulkAssignComplaints,
+  bulkDeleteComplaints,
+  bulkUpdateServicesStatus,
+  bulkAssignServices,
   exportComplaints,
+  exportServices,
 } from "../controllers/bulkController";
-import { authenticate, authorize } from "../middleware/auth";
+import { authenticate, authorize } from "../middleware/security";
 
-const router = Router();
+const router = express.Router();
 
-// All bulk operations require admin/staff authorization
-router.put(
-  "/complaints/status",
-  authenticate,
-  authorize("admin", "staff"),
-  bulkUpdateStatus
-);
+// All bulk routes require authentication
+router.use(authenticate);
 
-router.put(
-  "/complaints/assign",
-  authenticate,
-  authorize("admin", "staff"),
-  bulkAssign
-);
-
+// Bulk complaint operations - Admin and Staff
 router.post(
-  "/complaints/delete",
-  authenticate,
-  authorize("admin", "staff"),
-  bulkDelete
+  "/complaints/status",
+  authorize(["admin", "staff"]),
+  bulkUpdateComplaintsStatus,
 );
-
+router.post(
+  "/complaints/assign",
+  authorize(["admin", "staff"]),
+  bulkAssignComplaints,
+);
+router.post("/complaints/delete", authorize(["admin"]), bulkDeleteComplaints);
 router.get(
   "/complaints/export",
-  authenticate,
-  authorize("admin", "staff"),
-  exportComplaints
+  authorize(["admin", "staff"]),
+  exportComplaints,
 );
+
+// Bulk service operations - Admin and Staff
+router.post(
+  "/services/status",
+  authorize(["admin", "staff"]),
+  bulkUpdateServicesStatus,
+);
+router.post(
+  "/services/assign",
+  authorize(["admin", "staff"]),
+  bulkAssignServices,
+);
+router.get("/services/export", authorize(["admin", "staff"]), exportServices);
 
 export default router;

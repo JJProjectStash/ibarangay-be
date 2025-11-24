@@ -1,206 +1,336 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import Complaint from "../models/Complaint";
 import Service from "../models/Service";
 import Event from "../models/Event";
 import User from "../models/User";
 import Announcement from "../models/Announcement";
-import { AuthRequest, DashboardStats } from "../types";
 
-export const getDashboardStats = async (
-  _req: AuthRequest,
-  res: Response
-): Promise<void> => {
+/**
+ * Dashboard Controller
+ * Handles dashboard statistics and analytics endpoints
+ */
+
+/**
+ * Get overall system statistics
+ * @route GET /api/v1/dashboard/stats
+ * @access Admin, Staff
+ */
+export const getDashboardStats = async (req: Request, res: Response) => {
   try {
     const [
       totalComplaints,
       pendingComplaints,
-      inProgressComplaints,
       resolvedComplaints,
       totalServices,
-      totalEvents,
+      pendingServices,
+      completedServices,
       totalUsers,
+      activeUsers,
+      totalEvents,
+      upcomingEvents,
       totalAnnouncements,
-      complaintsByCategory,
-      complaintsByPriority,
-      recentComplaints,
-      recentServices,
-      recentEvents,
+      activeAnnouncements,
     ] = await Promise.all([
       Complaint.countDocuments(),
       Complaint.countDocuments({ status: "pending" }),
-      Complaint.countDocuments({ status: "in-progress" }),
       Complaint.countDocuments({ status: "resolved" }),
       Service.countDocuments(),
+      Service.countDocuments({ status: "pending" }),
+      Service.countDocuments({ status: "completed" }),
+      User.countDocuments({ role: "resident" }),
+      User.countDocuments({ role: "resident", isActive: true }),
       Event.countDocuments(),
-      User.countDocuments(),
+      Event.countDocuments({ date: { $gte: new Date() } }),
+      Announcement.countDocuments(),
       Announcement.countDocuments({ isPublished: true }),
-      Complaint.aggregate([
-        { $group: { _id: "$category", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 10 },
-        { $project: { category: "$_id", count: 1, _id: 0 } },
-      ]),
-      Complaint.aggregate([
-        { $group: { _id: "$priority", count: { $sum: 1 } } },
-        { $project: { priority: "$_id", count: 1, _id: 0 } },
-      ]),
-      Complaint.find()
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .populate("userId", "firstName lastName")
-        .select("title status priority createdAt"),
-      Service.find()
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .populate("userId", "firstName lastName")
-        .select("itemName status createdAt"),
-      Event.find()
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .populate("organizer", "firstName lastName")
-        .select("title status eventDate"),
     ]);
 
-    // Calculate average resolution time
-    const resolutionStats = await Complaint.aggregate([
-      {
-        $match: {
-          status: "resolved",
-          resolvedAt: { $exists: true },
-        },
-      },
-      {
-        $project: {
-          resolutionTime: {
-            $subtract: ["$resolvedAt", "$createdAt"],
-          },
-        },
-      },
-      {
-        $group: {
-          _id: null,
-          avgTime: { $avg: "$resolutionTime" },
-        },
-      },
-    ]);
-
-    const averageResolutionTime = resolutionStats[0]?.avgTime || 0;
-    const averageResolutionDays = Math.round(
-      averageResolutionTime / (1000 * 60 * 60 * 24)
-    );
-
-    const recentActivity = [
-      ...recentComplaints.map((c: any) => ({
-        type: "complaint",
-        title: c.title,
-        status: c.status,
-        user: c.userId,
-        createdAt: c.createdAt,
-      })),
-      ...recentServices.map((s: any) => ({
-        type: "service",
-        title: s.itemName,
-        status: s.status,
-        user: s.userId,
-        createdAt: s.createdAt,
-      })),
-      ...recentEvents.map((e: any) => ({
-        type: "event",
-        title: e.title,
-        status: e.status,
-        user: e.organizer,
-        createdAt: e.createdAt,
-      })),
-    ]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, 10);
-
-    const stats: DashboardStats = {
-      totalComplaints,
-      pendingComplaints,
-      inProgressComplaints,
-      resolvedComplaints,
-      totalServices,
-      totalEvents,
-      totalUsers,
-      totalAnnouncements,
-      complaintsByCategory,
-      complaintsByPriority,
-      recentActivity,
-      averageResolutionTime: averageResolutionDays,
-    };
-
-    res.status(200).json({
+    res.json({
       success: true,
-      data: stats,
+      data: {
+        complaints: {
+          total: totalComplaints,
+          pending: pendingComplaints,
+          resolved: resolvedComplaints,
+          inProgress: totalComplaints - pendingComplaints - resolvedComplaints,
+        },
+        services: {
+          total: totalServices,
+          pending: pendingServices,
+          completed: completedServices,
+          inProgress: totalServices - pendingServices - completedServices,
+        },
+        users: {
+          total: totalUsers,
+          active: activeUsers,
+          inactive: totalUsers - activeUsers,
+        },
+        events: {
+          total: totalEvents,
+          upcoming: upcomingEvents,
+          past: totalEvents - upcomingEvents,
+        },
+        announcements: {
+          total: totalAnnouncements,
+          active: activeAnnouncements,
+          draft: totalAnnouncements - activeAnnouncements,
+        },
+      },
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch dashboard statistics",
+      message: "Failed to fetch dashboard statistics",
+      error: error.message,
     });
   }
 };
 
-export const getUserDashboard = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+/**
+ * Get recent activities for dashboard
+ * @route GET /api/v1/dashboard/activities
+ * @access Admin, Staff
+ */
+export const getRecentActivities = async (req: Request, res: Response) => {
   try {
-    const userId = req.user?.id;
+    const limit = parseInt(req.query.limit as string) || 10;
 
-    const [
-      myComplaints,
-      myServices,
-      myEvents,
-      pendingComplaints,
-      resolvedComplaints,
-    ] = await Promise.all([
-      Complaint.countDocuments({ userId }),
-      Service.countDocuments({ userId }),
-      Event.countDocuments({ attendees: userId }),
-      Complaint.countDocuments({ userId, status: "pending" }),
-      Complaint.countDocuments({ userId, status: "resolved" }),
+    const [recentComplaints, recentServices, recentEvents] = await Promise.all([
+      Complaint.find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate("userId", "name email")
+        .select("title status category createdAt"),
+      Service.find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .populate("userId", "name email")
+        .select("title status category createdAt"),
+      Event.find()
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .select("title date location createdAt"),
     ]);
 
-    const recentComplaints = await Complaint.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select("title status priority createdAt");
+    const activities = [
+      ...recentComplaints.map((c) => ({
+        type: "complaint",
+        id: c._id,
+        title: c.title,
+        status: c.status,
+        category: c.category,
+        user: c.userId,
+        createdAt: c.createdAt,
+      })),
+      ...recentServices.map((s) => ({
+        type: "service",
+        id: s._id,
+        title: s.title,
+        status: s.status,
+        category: s.category,
+        user: s.userId,
+        createdAt: s.createdAt,
+      })),
+      ...recentEvents.map((e) => ({
+        type: "event",
+        id: e._id,
+        title: e.title,
+        date: e.date,
+        location: e.location,
+        createdAt: e.createdAt,
+      })),
+    ]
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )
+      .slice(0, limit);
 
-    const recentServices = await Service.find({ userId })
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .select("itemName status borrowDate");
-
-    const upcomingEvents = await Event.find({
-      attendees: userId,
-      eventDate: { $gte: new Date() },
-      status: "upcoming",
-    })
-      .sort({ eventDate: 1 })
-      .limit(5)
-      .select("title eventDate location");
-
-    res.status(200).json({
+    res.json({
       success: true,
-      data: {
-        summary: {
-          myComplaints,
-          myServices,
-          myEvents,
-          pendingComplaints,
-          resolvedComplaints,
-        },
-        recentComplaints,
-        recentServices,
-        upcomingEvents,
-      },
+      data: activities,
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to fetch user dashboard",
+      message: "Failed to fetch recent activities",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get time-series data for charts
+ * @route GET /api/v1/dashboard/time-series
+ * @access Admin, Staff
+ */
+export const getTimeSeriesData = async (req: Request, res: Response) => {
+  try {
+    const { type = "complaints", period = "7d" } = req.query;
+
+    const days = period === "30d" ? 30 : period === "90d" ? 90 : 7;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+
+    let Model;
+    switch (type) {
+      case "services":
+        Model = Service;
+        break;
+      case "events":
+        Model = Event;
+        break;
+      default:
+        Model = Complaint;
+    }
+
+    const data = await Model.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+          },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    res.json({
+      success: true,
+      data: data.map((d) => ({
+        date: d._id,
+        count: d.count,
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch time-series data",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get category distribution for pie charts
+ * @route GET /api/v1/dashboard/category-distribution
+ * @access Admin, Staff
+ */
+export const getCategoryDistribution = async (req: Request, res: Response) => {
+  try {
+    const { type = "complaints" } = req.query;
+
+    let Model;
+    switch (type) {
+      case "services":
+        Model = Service;
+        break;
+      default:
+        Model = Complaint;
+    }
+
+    const distribution = await Model.aggregate([
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $sort: { count: -1 },
+      },
+    ]);
+
+    res.json({
+      success: true,
+      data: distribution.map((d) => ({
+        category: d._id,
+        count: d.count,
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch category distribution",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Get staff performance metrics
+ * @route GET /api/v1/dashboard/staff-performance
+ * @access Admin
+ */
+export const getStaffPerformance = async (req: Request, res: Response) => {
+  try {
+    const staffMembers = await User.find({ role: "staff" }).select(
+      "name email",
+    );
+
+    const performance = await Promise.all(
+      staffMembers.map(async (staff) => {
+        const [
+          assignedComplaints,
+          resolvedComplaints,
+          assignedServices,
+          completedServices,
+        ] = await Promise.all([
+          Complaint.countDocuments({ assignedTo: staff._id }),
+          Complaint.countDocuments({
+            assignedTo: staff._id,
+            status: "resolved",
+          }),
+          Service.countDocuments({ assignedTo: staff._id }),
+          Service.countDocuments({
+            assignedTo: staff._id,
+            status: "completed",
+          }),
+        ]);
+
+        return {
+          staff: {
+            id: staff._id,
+            name: staff.name,
+            email: staff.email,
+          },
+          complaints: {
+            assigned: assignedComplaints,
+            resolved: resolvedComplaints,
+            resolutionRate:
+              assignedComplaints > 0
+                ? ((resolvedComplaints / assignedComplaints) * 100).toFixed(2)
+                : 0,
+          },
+          services: {
+            assigned: assignedServices,
+            completed: completedServices,
+            completionRate:
+              assignedServices > 0
+                ? ((completedServices / assignedServices) * 100).toFixed(2)
+                : 0,
+          },
+        };
+      }),
+    );
+
+    res.json({
+      success: true,
+      data: performance,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch staff performance",
+      error: error.message,
     });
   }
 };

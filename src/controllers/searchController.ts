@@ -1,187 +1,285 @@
-import { Response } from "express";
-import { AuthRequest } from "../types";
+import { Request, Response } from "express";
 import Complaint from "../models/Complaint";
 import Service from "../models/Service";
 import Event from "../models/Event";
-import User from "../models/User";
 import Announcement from "../models/Announcement";
+import User from "../models/User";
 
-interface SearchResult {
-  id: string;
-  type: "complaint" | "service" | "event" | "user" | "announcement";
-  title: string;
-  description: string;
-  url: string;
-}
+/**
+ * Search Controller
+ * Handles global search and advanced filtering
+ */
 
-export const globalSearch = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+/**
+ * Global search across all entities
+ * @route GET /api/v1/search/global
+ * @access Authenticated
+ */
+export const globalSearch = async (req: Request, res: Response) => {
   try {
-    const { q: query } = req.query;
+    const { q, type } = req.query;
+    const user = (req as any).user;
 
-    if (!query || typeof query !== "string" || query.trim().length < 2) {
-      res.status(400).json({
+    if (!q || typeof q !== "string") {
+      return res.status(400).json({
         success: false,
-        message: "Search query must be at least 2 characters",
+        message: "Search query is required",
       });
-      return;
     }
 
-    const searchRegex = new RegExp(query.trim(), "i");
-    const results: SearchResult[] = [];
-    const userRole = req.user?.role;
-
-    // Search Complaints
-    const complaintQuery: any = {
-      $or: [
-        { title: searchRegex },
-        { description: searchRegex },
-        { category: searchRegex },
-      ],
+    const searchRegex = { $regex: q, $options: "i" };
+    const results: any = {
+      complaints: [],
+      services: [],
+      events: [],
+      announcements: [],
+      users: [],
     };
 
-    // Residents only see their own complaints
-    if (userRole === "resident") {
-      complaintQuery.userId = req.user?.id;
-    }
-
-    const complaints = await Complaint.find(complaintQuery)
-      .limit(10)
-      .select("_id title description status")
-      .lean();
-
-    complaints.forEach((complaint) => {
-      results.push({
-        id: complaint._id.toString(),
-        type: "complaint",
-        title: complaint.title,
-        description: `${complaint.description.substring(0, 100)}... (Status: ${complaint.status})`,
-        url: `/complaints?id=${complaint._id}`,
-      });
-    });
-
-    // Search Services
-    const serviceQuery: any = {
-      $or: [
-        { itemName: searchRegex },
-        { itemType: searchRegex },
-        { purpose: searchRegex },
-      ],
-    };
-
-    if (userRole === "resident") {
-      serviceQuery.userId = req.user?.id;
-    }
-
-    const services = await Service.find(serviceQuery)
-      .limit(10)
-      .select("_id itemName purpose status")
-      .lean();
-
-    services.forEach((service) => {
-      results.push({
-        id: service._id.toString(),
-        type: "service",
-        title: service.itemName,
-        description: `${service.purpose.substring(0, 100)}... (Status: ${service.status})`,
-        url: `/services?id=${service._id}`,
-      });
-    });
-
-    // Search Events
-    const events = await Event.find({
-      $or: [
-        { title: searchRegex },
-        { description: searchRegex },
-        { location: searchRegex },
-        { category: searchRegex },
-      ],
-    })
-      .limit(10)
-      .select("_id title description eventDate location")
-      .lean();
-
-    events.forEach((event) => {
-      results.push({
-        id: event._id.toString(),
-        type: "event",
-        title: event.title,
-        description: `${event.description.substring(0, 100)}... (${new Date(event.eventDate).toLocaleDateString()} at ${event.location})`,
-        url: `/events?id=${event._id}`,
-      });
-    });
-
-    // Search Announcements
-    const announcements = await Announcement.find({
-      status: "published",
-      $or: [
-        { title: searchRegex },
-        { content: searchRegex },
-        { category: searchRegex },
-      ],
-    })
-      .limit(10)
-      .select("_id title content priority")
-      .lean();
-
-    announcements.forEach((announcement) => {
-      results.push({
-        id: announcement._id.toString(),
-        type: "announcement",
-        title: announcement.title,
-        description: `${announcement.content.substring(0, 100)}... (Priority: ${announcement.priority})`,
-        url: `/announcements?id=${announcement._id}`,
-      });
-    });
-
-    // Search Users (admin/staff only)
-    if (userRole === "admin" || userRole === "staff") {
-      const users = await User.find({
+    // Search complaints
+    if (!type || type === "complaints") {
+      const complaintFilter: any = {
         $or: [
-          { firstName: searchRegex },
-          { lastName: searchRegex },
-          { email: searchRegex },
+          { title: searchRegex },
+          { description: searchRegex },
+          { category: searchRegex },
+        ],
+      };
+
+      // Residents can only see their own complaints
+      if (user.role === "resident") {
+        complaintFilter.userId = user.id;
+      }
+
+      results.complaints = await Complaint.find(complaintFilter)
+        .limit(20)
+        .populate("userId", "name email")
+        .populate("assignedTo", "name email")
+        .select("title description category status createdAt")
+        .sort({ createdAt: -1 });
+    }
+
+    // Search services
+    if (!type || type === "services") {
+      const serviceFilter: any = {
+        $or: [
+          { title: searchRegex },
+          { description: searchRegex },
+          { category: searchRegex },
+        ],
+      };
+
+      // Residents can only see their own services
+      if (user.role === "resident") {
+        serviceFilter.userId = user.id;
+      }
+
+      results.services = await Service.find(serviceFilter)
+        .limit(20)
+        .populate("userId", "name email")
+        .populate("assignedTo", "name email")
+        .select("title description category status createdAt")
+        .sort({ createdAt: -1 });
+    }
+
+    // Search events
+    if (!type || type === "events") {
+      results.events = await Event.find({
+        $or: [
+          { title: searchRegex },
+          { description: searchRegex },
+          { location: searchRegex },
         ],
       })
-        .limit(10)
-        .select("_id firstName lastName email role")
-        .lean();
-
-      users.forEach((user) => {
-        results.push({
-          id: user._id.toString(),
-          type: "user",
-          title: `${user.firstName} ${user.lastName}`,
-          description: `${user.email} (${user.role})`,
-          url: `/admin/users?id=${user._id}`,
-        });
-      });
+        .limit(20)
+        .select("title description date location createdAt")
+        .sort({ date: -1 });
     }
 
-    // Sort results by relevance (prioritize title matches)
-    results.sort((a, b) => {
-      const aScore = a.title.toLowerCase().includes(query.toLowerCase())
-        ? 1
-        : 0;
-      const bScore = b.title.toLowerCase().includes(query.toLowerCase())
-        ? 1
-        : 0;
-      return bScore - aScore;
-    });
+    // Search announcements (published only for residents)
+    if (!type || type === "announcements") {
+      const announcementFilter: any = {
+        $or: [{ title: searchRegex }, { content: searchRegex }],
+      };
 
-    res.status(200).json({
+      if (user.role === "resident") {
+        announcementFilter.isPublished = true;
+      }
+
+      results.announcements = await Announcement.find(announcementFilter)
+        .limit(20)
+        .populate("createdBy", "name email")
+        .select("title content category isPublished createdAt")
+        .sort({ createdAt: -1 });
+    }
+
+    // Search users (admin only)
+    if (user.role === "admin" && (!type || type === "users")) {
+      results.users = await User.find({
+        $or: [
+          { name: searchRegex },
+          { email: searchRegex },
+          { phone: searchRegex },
+        ],
+      })
+        .limit(20)
+        .select("name email phone role isActive createdAt")
+        .sort({ createdAt: -1 });
+    }
+
+    // Calculate total results
+    const totalResults = Object.values(results).reduce(
+      (sum: number, arr: any) => sum + arr.length,
+      0,
+    );
+
+    res.json({
       success: true,
-      data: results.slice(0, 20), // Limit to 20 total results
-      query: query.trim(),
-      count: results.length,
+      query: q,
+      totalResults,
+      data: results,
     });
   } catch (error: any) {
-    console.error("Global search error:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Search failed",
+      message: "Search failed",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Advanced filter for complaints
+ * @route GET /api/v1/search/complaints/filter
+ * @access Authenticated
+ */
+export const filterComplaints = async (req: Request, res: Response) => {
+  try {
+    const {
+      status,
+      category,
+      priority,
+      assignedTo,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const user = (req as any).user;
+    const filter: any = {};
+
+    // Residents can only see their own complaints
+    if (user.role === "resident") {
+      filter.userId = user.id;
+    }
+
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (priority) filter.priority = priority;
+    if (assignedTo) filter.assignedTo = assignedTo;
+
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [complaints, total] = await Promise.all([
+      Complaint.find(filter)
+        .populate("userId", "name email")
+        .populate("assignedTo", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Complaint.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: complaints,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Filter failed",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Advanced filter for services
+ * @route GET /api/v1/search/services/filter
+ * @access Authenticated
+ */
+export const filterServices = async (req: Request, res: Response) => {
+  try {
+    const {
+      status,
+      category,
+      priority,
+      assignedTo,
+      startDate,
+      endDate,
+      page = 1,
+      limit = 20,
+    } = req.query;
+
+    const user = (req as any).user;
+    const filter: any = {};
+
+    // Residents can only see their own services
+    if (user.role === "resident") {
+      filter.userId = user.id;
+    }
+
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (priority) filter.priority = priority;
+    if (assignedTo) filter.assignedTo = assignedTo;
+
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const [services, total] = await Promise.all([
+      Service.find(filter)
+        .populate("userId", "name email")
+        .populate("assignedTo", "name email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Service.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: services,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit)),
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Filter failed",
+      error: error.message,
     });
   }
 };

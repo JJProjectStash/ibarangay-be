@@ -47,7 +47,7 @@ export const initializeSocket = (httpServer: HTTPServer): Server => {
   io.on("connection", (socket: Socket) => {
     const authSocket = socket as AuthSocket;
     console.log(
-      `✅ User connected: ${authSocket.userId} (${authSocket.userRole})`
+      `✅ User connected: ${authSocket.userId} (${authSocket.userRole})`,
     );
 
     // Join user-specific room
@@ -64,14 +64,14 @@ export const initializeSocket = (httpServer: HTTPServer): Server => {
     socket.on("subscribe:complaint", (complaintId: string) => {
       socket.join(`complaint:${complaintId}`);
       console.log(
-        `User ${authSocket.userId} subscribed to complaint ${complaintId}`
+        `User ${authSocket.userId} subscribed to complaint ${complaintId}`,
       );
     });
 
     socket.on("unsubscribe:complaint", (complaintId: string) => {
       socket.leave(`complaint:${complaintId}`);
       console.log(
-        `User ${authSocket.userId} unsubscribed from complaint ${complaintId}`
+        `User ${authSocket.userId} unsubscribed from complaint ${complaintId}`,
       );
     });
 
@@ -121,7 +121,7 @@ export const emitToStaff = (event: string, data: any) => {
 export const emitToComplaint = (
   complaintId: string,
   event: string,
-  data: any
+  data: any,
 ) => {
   if (io) {
     io.to(`complaint:${complaintId}`).emit(event, data);

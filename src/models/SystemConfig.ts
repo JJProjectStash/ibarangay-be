@@ -39,7 +39,7 @@ const systemConfigSchema = new Schema<ISystemConfig>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Initialize default configurations
@@ -70,12 +70,12 @@ systemConfigSchema.statics.initializeDefaults = async function () {
     await this.findOneAndUpdate(
       { key: config.key },
       { $setOnInsert: config },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
   }
 };
 
 export default mongoose.model<ISystemConfig, ISystemConfigModel>(
   "SystemConfig",
-  systemConfigSchema
+  systemConfigSchema,
 );

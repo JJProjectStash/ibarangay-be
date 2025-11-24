@@ -8,7 +8,7 @@ import SystemConfig from "../models/SystemConfig";
 export const validateComplaintCategory = async (
   req: Request,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const config = await SystemConfig.findOne({ key: "complaint_categories" });
@@ -26,7 +26,7 @@ export const validateComplaintCategory = async (
       !validCategories.includes(req.body.category.toLowerCase())
     ) {
       throw new ValidationError(
-        `Invalid category. Valid categories are: ${validCategories.join(", ")}`
+        `Invalid category. Valid categories are: ${validCategories.join(", ")}`,
       );
     }
 
@@ -42,7 +42,7 @@ export const validateComplaintCategory = async (
 export const validateServiceItemType = async (
   req: Request,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): Promise<void> => {
   try {
     const config = await SystemConfig.findOne({ key: "service_item_types" });
@@ -58,7 +58,7 @@ export const validateServiceItemType = async (
       !validItemTypes.includes(req.body.itemType.toLowerCase())
     ) {
       throw new ValidationError(
-        `Invalid item type. Valid item types are: ${validItemTypes.join(", ")}`
+        `Invalid item type. Valid item types are: ${validItemTypes.join(", ")}`,
       );
     }
 

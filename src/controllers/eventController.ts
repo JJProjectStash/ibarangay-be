@@ -8,7 +8,7 @@ import { AuthRequest } from "../types";
 
 export const createEvent = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const {
@@ -66,7 +66,7 @@ export const createEvent = async (
 
 export const getEvents = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { status, category, search } = req.query;
@@ -119,7 +119,7 @@ export const getEvents = async (
 
 export const getEventById = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const event = await Event.findById(req.params.id)
@@ -158,12 +158,12 @@ export const getEventById = async (
 
 export const getEventAttendees = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const event = await Event.findById(req.params.id).populate(
       "attendees",
-      "firstName lastName email phoneNumber address createdAt"
+      "firstName lastName email phoneNumber address createdAt",
     );
 
     if (!event) {
@@ -210,7 +210,7 @@ export const getEventAttendees = async (
 
 export const registerForEvent = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const event = await Event.findById(req.params.id);
@@ -228,7 +228,7 @@ export const registerForEvent = async (
     // Check if already registered
     if (
       event.attendees.some((attendee: Types.ObjectId) =>
-        attendee.equals(userId)
+        attendee.equals(userId),
       )
     ) {
       res.status(400).json({
@@ -292,7 +292,7 @@ export const registerForEvent = async (
 
 export const unregisterFromEvent = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const event = await Event.findById(req.params.id);
@@ -310,7 +310,7 @@ export const unregisterFromEvent = async (
     // Check if registered
     if (
       !event.attendees.some((attendee: Types.ObjectId) =>
-        attendee.equals(userId)
+        attendee.equals(userId),
       )
     ) {
       res.status(400).json({
@@ -321,7 +321,7 @@ export const unregisterFromEvent = async (
     }
 
     event.attendees = event.attendees.filter(
-      (attendeeId: Types.ObjectId) => !attendeeId.equals(userId)
+      (attendeeId: Types.ObjectId) => !attendeeId.equals(userId),
     );
     await event.save();
 
@@ -359,7 +359,7 @@ export const unregisterFromEvent = async (
 
 export const updateEvent = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const event = await Event.findById(req.params.id);
@@ -388,7 +388,7 @@ export const updateEvent = async (
     const updatedEvent = await Event.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     // Create audit log
@@ -423,7 +423,7 @@ export const updateEvent = async (
 
 export const deleteEvent = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const event = await Event.findById(req.params.id);
@@ -481,12 +481,12 @@ export const deleteEvent = async (
 
 export const exportEventAttendees = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const event = await Event.findById(req.params.id).populate(
       "attendees",
-      "firstName lastName email phoneNumber address"
+      "firstName lastName email phoneNumber address",
     );
 
     if (!event) {

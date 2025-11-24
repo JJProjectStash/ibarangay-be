@@ -3,105 +3,79 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IAnnouncement extends Document {
   title: string;
   content: string;
-  category:
-    | "general"
-    | "emergency"
-    | "event"
-    | "maintenance"
-    | "health"
-    | "security";
-  priority: "low" | "medium" | "high" | "urgent";
-  author: mongoose.Types.ObjectId;
-  imageUrl?: string;
-  attachments?: string[];
+  category: string;
+  priority: "low" | "normal" | "high" | "urgent";
   isPublished: boolean;
-  publishedAt?: Date;
-  expiresAt?: Date;
+  isPinned: boolean;
   views: number;
+  createdBy: mongoose.Types.ObjectId;
+  publishedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const announcementSchema = new Schema<IAnnouncement>(
+const AnnouncementSchema = new Schema<IAnnouncement>(
   {
     title: {
       type: String,
       required: [true, "Title is required"],
       trim: true,
-      minlength: [5, "Title must be at least 5 characters"],
-      maxlength: [150, "Title must not exceed 150 characters"],
+      maxlength: [200, "Title cannot exceed 200 characters"],
     },
     content: {
       type: String,
       required: [true, "Content is required"],
-      minlength: [20, "Content must be at least 20 characters"],
-      maxlength: [5000, "Content must not exceed 5000 characters"],
     },
     category: {
       type: String,
-      enum: [
-        "general",
-        "emergency",
-        "event",
-        "maintenance",
-        "health",
-        "security",
-      ],
       required: [true, "Category is required"],
-      default: "general",
+      enum: ["general", "emergency", "event", "maintenance", "policy", "other"],
     },
     priority: {
       type: String,
-      enum: ["low", "medium", "high", "urgent"],
-      default: "medium",
+      enum: ["low", "normal", "high", "urgent"],
+      default: "normal",
     },
-    author: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Author is required"],
-    },
-    imageUrl: {
-      type: String,
-    },
-    attachments: [
-      {
-        type: String,
-      },
-    ],
     isPublished: {
       type: Boolean,
       default: false,
     },
-    publishedAt: {
-      type: Date,
-    },
-    expiresAt: {
-      type: Date,
+    isPinned: {
+      type: Boolean,
+      default: false,
     },
     views: {
       type: Number,
       default: 0,
     },
+    createdBy: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    publishedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-// Indexes for efficient queries
-announcementSchema.index({ category: 1, isPublished: 1 });
-announcementSchema.index({ priority: 1, isPublished: 1 });
-announcementSchema.index({ publishedAt: -1 });
-announcementSchema.index({ expiresAt: 1 });
-announcementSchema.index({ createdAt: -1 });
+// Index for efficient querying
+AnnouncementSchema.index({ isPublished: 1, isPinned: -1, createdAt: -1 });
+AnnouncementSchema.index({ category: 1 });
+AnnouncementSchema.index({ title: "text", content: "text" });
 
-// Virtual for checking if announcement is expired
-announcementSchema.virtual("isExpired").get(function () {
-  if (!this.expiresAt) return false;
-  return new Date() > this.expiresAt;
+// Update publishedAt when isPublished changes to true
+AnnouncementSchema.pre("save", function (next) {
+  if (this.isModified("isPublished") && this.isPublished && !this.publishedAt) {
+    this.publishedAt = new Date();
+  }
+  next();
 });
 
 export default mongoose.model<IAnnouncement>(
   "Announcement",
-  announcementSchema
+  AnnouncementSchema,
 );

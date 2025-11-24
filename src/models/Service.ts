@@ -66,7 +66,7 @@ const serviceSchema = new Schema<IService>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes for efficient queries

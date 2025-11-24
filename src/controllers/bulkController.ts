@@ -1,98 +1,40 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import Complaint from "../models/Complaint";
-import User from "../models/User";
-import Notification from "../models/Notification";
-import { AuthRequest } from "../types";
-import { emitToUser, emitToComplaint } from "../config/socket";
-import {
-  exportComplaintsToCSV,
-  exportComplaintsToExcel,
-  deleteExportFile,
-} from "../utils/exportHelper";
-import path from "path";
+import Service from "../models/Service";
+import { Parser } from "json2csv";
 
-export const bulkUpdateStatus = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+/**
+ * Bulk Operations Controller
+ * Handles bulk operations on complaints and services
+ */
+
+/**
+ * Bulk update complaints status
+ * @route POST /api/v1/bulk/complaints/status
+ * @access Admin, Staff
+ */
+export const bulkUpdateComplaintsStatus = async (
+  req: Request,
+  res: Response,
+) => {
   try {
-    const { complaintIds, status, response } = req.body;
+    const { complaintIds, status } = req.body;
 
-    if (
-      !complaintIds ||
-      !Array.isArray(complaintIds) ||
-      complaintIds.length === 0
-    ) {
-      res.status(400).json({
+    if (!Array.isArray(complaintIds) || complaintIds.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Please provide an array of complaint IDs",
+        message: "Complaint IDs array is required",
       });
-      return;
-    }
-
-    if (!status) {
-      res.status(400).json({
-        success: false,
-        message: "Status is required",
-      });
-      return;
-    }
-
-    const updateData: any = {
-      status,
-      $push: {
-        history: {
-          action: "Bulk status update",
-          performedBy: req.user?.id,
-          newStatus: status,
-          notes: response || "Bulk update performed",
-          timestamp: new Date(),
-        },
-      },
-    };
-
-    if (response) {
-      updateData.response = response;
-    }
-
-    if (status === "resolved" || status === "closed") {
-      updateData.resolvedBy = req.user?.id;
-      updateData.resolvedAt = new Date();
     }
 
     const result = await Complaint.updateMany(
       { _id: { $in: complaintIds } },
-      updateData
+      { status, updatedAt: new Date() },
     );
 
-    // Send notifications to users
-    const complaints = await Complaint.find({ _id: { $in: complaintIds } });
-
-    for (const complaint of complaints) {
-      await Notification.create({
-        userId: complaint.userId,
-        title: "Complaint Updated",
-        message: `Your complaint "${complaint.title}" status has been updated to ${status}`,
-        type: status === "resolved" ? "success" : "info",
-        relatedId: complaint._id,
-        relatedType: "complaint",
-      });
-
-      // Emit real-time update
-      emitToUser(complaint.userId.toString(), "complaint:updated", {
-        complaintId: complaint._id,
-        status,
-      });
-
-      emitToComplaint(complaint._id.toString(), "status:changed", {
-        status,
-        updatedBy: req.user?.id,
-      });
-    }
-
-    res.status(200).json({
+    res.json({
       success: true,
-      message: `Successfully updated ${result.modifiedCount} complaints`,
+      message: `${result.modifiedCount} complaints updated successfully`,
       data: {
         matched: result.matchedCount,
         modified: result.modifiedCount,
@@ -101,77 +43,36 @@ export const bulkUpdateStatus = async (
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to bulk update complaints",
+      message: "Failed to bulk update complaints",
+      error: error.message,
     });
   }
 };
 
-export const bulkAssign = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+/**
+ * Bulk assign complaints to staff
+ * @route POST /api/v1/bulk/complaints/assign
+ * @access Admin, Staff
+ */
+export const bulkAssignComplaints = async (req: Request, res: Response) => {
   try {
-    const { complaintIds, staffId } = req.body;
+    const { complaintIds, assignedTo } = req.body;
 
-    if (
-      !complaintIds ||
-      !Array.isArray(complaintIds) ||
-      complaintIds.length === 0
-    ) {
-      res.status(400).json({
+    if (!Array.isArray(complaintIds) || complaintIds.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Please provide an array of complaint IDs",
+        message: "Complaint IDs array is required",
       });
-      return;
-    }
-
-    if (!staffId) {
-      res.status(400).json({
-        success: false,
-        message: "Staff ID is required",
-      });
-      return;
-    }
-
-    const staff = await User.findById(staffId);
-    if (!staff || staff.role !== "staff") {
-      res.status(400).json({
-        success: false,
-        message: "Invalid staff member",
-      });
-      return;
     }
 
     const result = await Complaint.updateMany(
       { _id: { $in: complaintIds } },
-      {
-        assignedTo: staffId,
-        $push: {
-          history: {
-            action: "Bulk assignment",
-            performedBy: req.user?.id,
-            notes: `Bulk assigned to ${staff.firstName} ${staff.lastName}`,
-            timestamp: new Date(),
-          },
-        },
-      }
+      { assignedTo, status: "in-progress", updatedAt: new Date() },
     );
 
-    // Notify assigned staff
-    await Notification.create({
-      userId: staffId,
-      title: "Bulk Assignment",
-      message: `You have been assigned ${result.modifiedCount} new complaints`,
-      type: "info",
-    });
-
-    emitToUser(staffId, "complaints:bulk-assigned", {
-      count: result.modifiedCount,
-    });
-
-    res.status(200).json({
+    res.json({
       success: true,
-      message: `Successfully assigned ${result.modifiedCount} complaints to ${staff.firstName} ${staff.lastName}`,
+      message: `${result.modifiedCount} complaints assigned successfully`,
       data: {
         matched: result.matchedCount,
         modified: result.modifiedCount,
@@ -180,39 +81,33 @@ export const bulkAssign = async (
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to bulk assign complaints",
+      message: "Failed to bulk assign complaints",
+      error: error.message,
     });
   }
 };
 
-export const bulkDelete = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+/**
+ * Bulk delete complaints
+ * @route POST /api/v1/bulk/complaints/delete
+ * @access Admin
+ */
+export const bulkDeleteComplaints = async (req: Request, res: Response) => {
   try {
     const { complaintIds } = req.body;
 
-    if (
-      !complaintIds ||
-      !Array.isArray(complaintIds) ||
-      complaintIds.length === 0
-    ) {
-      res.status(400).json({
+    if (!Array.isArray(complaintIds) || complaintIds.length === 0) {
+      return res.status(400).json({
         success: false,
-        message: "Please provide an array of complaint IDs",
+        message: "Complaint IDs array is required",
       });
-      return;
     }
 
-    // Only allow deletion of pending complaints
-    const result = await Complaint.deleteMany({
-      _id: { $in: complaintIds },
-      status: "pending",
-    });
+    const result = await Complaint.deleteMany({ _id: { $in: complaintIds } });
 
-    res.status(200).json({
+    res.json({
       success: true,
-      message: `Successfully deleted ${result.deletedCount} complaints`,
+      message: `${result.deletedCount} complaints deleted successfully`,
       data: {
         deleted: result.deletedCount,
       },
@@ -220,61 +115,192 @@ export const bulkDelete = async (
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to bulk delete complaints",
+      message: "Failed to bulk delete complaints",
+      error: error.message,
     });
   }
 };
 
-export const exportComplaints = async (
-  req: AuthRequest,
-  res: Response
-): Promise<void> => {
+/**
+ * Bulk update services status
+ * @route POST /api/v1/bulk/services/status
+ * @access Admin, Staff
+ */
+export const bulkUpdateServicesStatus = async (req: Request, res: Response) => {
   try {
-    const {
-      format = "csv",
-      status,
-      priority,
-      category,
-      startDate,
-      endDate,
-    } = req.query;
+    const { serviceIds, status } = req.body;
 
-    const query: any = {};
-
-    if (status) query.status = status;
-    if (priority) query.priority = priority;
-    if (category) query.category = category;
-    if (startDate || endDate) {
-      query.createdAt = {};
-      if (startDate) query.createdAt.$gte = new Date(startDate as string);
-      if (endDate) query.createdAt.$lte = new Date(endDate as string);
+    if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Service IDs array is required",
+      });
     }
 
-    const complaints = await Complaint.find(query)
-      .populate("userId", "firstName lastName email")
-      .populate("assignedTo", "firstName lastName")
-      .sort({ createdAt: -1 });
+    const result = await Service.updateMany(
+      { _id: { $in: serviceIds } },
+      { status, updatedAt: new Date() },
+    );
 
-    const filename = `complaints-export-${Date.now()}`;
-    let filePath: string;
-
-    if (format === "excel" || format === "xlsx") {
-      filePath = await exportComplaintsToExcel(complaints, filename);
-    } else {
-      filePath = await exportComplaintsToCSV(complaints, filename);
-    }
-
-    res.download(filePath, path.basename(filePath), (err) => {
-      if (err) {
-        console.error("Download error:", err);
-      }
-      // Delete file after download
-      setTimeout(() => deleteExportFile(filePath), 5000);
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} services updated successfully`,
+      data: {
+        matched: result.matchedCount,
+        modified: result.modifiedCount,
+      },
     });
   } catch (error: any) {
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to export complaints",
+      message: "Failed to bulk update services",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Bulk assign services to staff
+ * @route POST /api/v1/bulk/services/assign
+ * @access Admin, Staff
+ */
+export const bulkAssignServices = async (req: Request, res: Response) => {
+  try {
+    const { serviceIds, assignedTo } = req.body;
+
+    if (!Array.isArray(serviceIds) || serviceIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Service IDs array is required",
+      });
+    }
+
+    const result = await Service.updateMany(
+      { _id: { $in: serviceIds } },
+      { assignedTo, status: "in-progress", updatedAt: new Date() },
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} services assigned successfully`,
+      data: {
+        matched: result.matchedCount,
+        modified: result.modifiedCount,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to bulk assign services",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Export complaints to CSV
+ * @route GET /api/v1/bulk/complaints/export
+ * @access Admin, Staff
+ */
+export const exportComplaints = async (req: Request, res: Response) => {
+  try {
+    const { status, category, startDate, endDate } = req.query;
+
+    // Build filter
+    const filter: any = {};
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    const complaints = await Complaint.find(filter)
+      .populate("userId", "name email")
+      .populate("assignedTo", "name email")
+      .lean();
+
+    // Transform data for CSV
+    const data = complaints.map((c) => ({
+      ID: c._id,
+      Title: c.title,
+      Description: c.description,
+      Category: c.category,
+      Status: c.status,
+      Priority: c.priority || "normal",
+      "Submitted By": c.userId?.name || "N/A",
+      "Submitted Email": c.userId?.email || "N/A",
+      "Assigned To": c.assignedTo?.name || "Unassigned",
+      "Created At": new Date(c.createdAt).toLocaleString(),
+      "Updated At": new Date(c.updatedAt).toLocaleString(),
+    }));
+
+    const parser = new Parser();
+    const csv = parser.parse(data);
+
+    res.header("Content-Type", "text/csv");
+    res.header("Content-Disposition", "attachment; filename=complaints.csv");
+    res.send(csv);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to export complaints",
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Export services to CSV
+ * @route GET /api/v1/bulk/services/export
+ * @access Admin, Staff
+ */
+export const exportServices = async (req: Request, res: Response) => {
+  try {
+    const { status, category, startDate, endDate } = req.query;
+
+    // Build filter
+    const filter: any = {};
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) filter.createdAt.$gte = new Date(startDate as string);
+      if (endDate) filter.createdAt.$lte = new Date(endDate as string);
+    }
+
+    const services = await Service.find(filter)
+      .populate("userId", "name email")
+      .populate("assignedTo", "name email")
+      .lean();
+
+    // Transform data for CSV
+    const data = services.map((s) => ({
+      ID: s._id,
+      Title: s.title,
+      Description: s.description,
+      Category: s.category,
+      Status: s.status,
+      Priority: s.priority || "normal",
+      "Requested By": s.userId?.name || "N/A",
+      "Requested Email": s.userId?.email || "N/A",
+      "Assigned To": s.assignedTo?.name || "Unassigned",
+      "Created At": new Date(s.createdAt).toLocaleString(),
+      "Updated At": new Date(s.updatedAt).toLocaleString(),
+    }));
+
+    const parser = new Parser();
+    const csv = parser.parse(data);
+
+    res.header("Content-Type", "text/csv");
+    res.header("Content-Disposition", "attachment; filename=services.csv");
+    res.send(csv);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to export services",
+      error: error.message,
     });
   }
 };

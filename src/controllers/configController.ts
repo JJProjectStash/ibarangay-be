@@ -4,7 +4,7 @@ import { AuthRequest } from "../types";
 
 export const getComplaintCategories = async (
   _req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const config = await SystemConfig.findOne({ key: "complaint_categories" });
@@ -31,7 +31,7 @@ export const getComplaintCategories = async (
 
 export const getServiceItemTypes = async (
   _req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const config = await SystemConfig.findOne({ key: "service_item_types" });
@@ -58,7 +58,7 @@ export const getServiceItemTypes = async (
 
 export const updateComplaintCategories = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { categories } = req.body;
@@ -86,7 +86,7 @@ export const updateComplaintCategories = async (
         value: categories.map((cat) => cat.trim().toLowerCase()),
         updatedBy: req.user?.id,
       },
-      { new: true, upsert: true }
+      { new: true, upsert: true },
     );
 
     res.status(200).json({
@@ -104,7 +104,7 @@ export const updateComplaintCategories = async (
 
 export const updateServiceItemTypes = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { itemTypes } = req.body;
@@ -132,7 +132,7 @@ export const updateServiceItemTypes = async (
         value: itemTypes.map((type) => type.trim().toLowerCase()),
         updatedBy: req.user?.id,
       },
-      { new: true, upsert: true }
+      { new: true, upsert: true },
     );
 
     res.status(200).json({

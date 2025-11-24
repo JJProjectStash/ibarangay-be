@@ -6,7 +6,7 @@ import { deleteFile } from "../middleware/upload";
 
 export const uploadComplaintAttachment = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     if (!req.file) {
@@ -73,7 +73,7 @@ export const uploadComplaintAttachment = async (
 
 export const deleteComplaintAttachment = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { id: complaintId, fileUrl } = req.params;
@@ -103,7 +103,7 @@ export const deleteComplaintAttachment = async (
     // Remove from attachments array
     const decodedFileUrl = decodeURIComponent(fileUrl);
     complaint.attachments = complaint.attachments?.filter(
-      (url) => url !== decodedFileUrl
+      (url) => url !== decodedFileUrl,
     );
     await complaint.save();
 
@@ -124,7 +124,7 @@ export const deleteComplaintAttachment = async (
 
 export const uploadEventImage = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     if (!req.file) {

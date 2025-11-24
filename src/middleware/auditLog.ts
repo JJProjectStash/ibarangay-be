@@ -10,7 +10,7 @@ export const auditLogMiddleware = (action: string) => {
   return async (
     req: AuthRequest,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ): Promise<void> => {
     try {
       // Store original res.json to intercept response
@@ -43,7 +43,7 @@ export const auditLogMiddleware = (action: string) => {
 async function logAuditEntry(
   req: AuthRequest,
   action: string,
-  responseBody: any
+  responseBody: any,
 ): Promise<void> {
   try {
     if (!req.user?.id) return;

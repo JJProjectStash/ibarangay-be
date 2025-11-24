@@ -8,7 +8,7 @@ import { ValidationError } from "../utils/AppError";
 export const validate = (
   req: Request,
   _res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -55,7 +55,7 @@ export const registerValidation = [
     .withMessage("Password must be at least 8 characters")
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage(
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number",
     ),
   body("address")
     .trim()
@@ -132,7 +132,7 @@ export const changePasswordValidation = [
     .withMessage("New password must be at least 8 characters")
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage(
-      "New password must contain at least one uppercase letter, one lowercase letter, and one number"
+      "New password must contain at least one uppercase letter, one lowercase letter, and one number",
     ),
   body("confirmPassword")
     .notEmpty()

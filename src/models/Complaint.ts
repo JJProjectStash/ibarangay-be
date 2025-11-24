@@ -109,7 +109,7 @@ const complaintSchema = new Schema<IComplaint>(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Indexes

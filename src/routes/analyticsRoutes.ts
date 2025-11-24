@@ -16,42 +16,42 @@ router.get(
   "/time-series",
   authenticate,
   authorize("admin", "staff"),
-  getTimeSeriesData
+  getTimeSeriesData,
 );
 
 router.get(
   "/staff-performance",
   authenticate,
   authorize("admin", "staff"),
-  getStaffPerformance
+  getStaffPerformance,
 );
 
 router.get(
   "/category",
   authenticate,
   authorize("admin", "staff"),
-  getCategoryAnalytics
+  getCategoryAnalytics,
 );
 
 router.get(
   "/response-time",
   authenticate,
   authorize("admin", "staff"),
-  getResponseTimeAnalytics
+  getResponseTimeAnalytics,
 );
 
 router.get(
   "/trends",
   authenticate,
   authorize("admin", "staff"),
-  getTrendAnalysis
+  getTrendAnalysis,
 );
 
 router.get(
   "/monthly-report",
   authenticate,
   authorize("admin", "staff"),
-  getMonthlyReport
+  getMonthlyReport,
 );
 
 export default router;

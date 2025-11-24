@@ -7,7 +7,7 @@ import { AuthRequest } from "../types";
 
 export const createServiceRequest = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const {
@@ -72,7 +72,7 @@ export const createServiceRequest = async (
 
 export const getServiceRequests = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { status, search, page = 1, limit = 10 } = req.query;
@@ -127,12 +127,12 @@ export const getServiceRequests = async (
 
 export const getServiceRequestById = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const service = await Service.findById(req.params.id).populate(
       "userId",
-      "firstName lastName email phoneNumber address"
+      "firstName lastName email phoneNumber address",
     );
 
     if (!service) {
@@ -169,7 +169,7 @@ export const getServiceRequestById = async (
 
 export const updateServiceStatus = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { status, notes, rejectionReason } = req.body;
@@ -190,7 +190,7 @@ export const updateServiceStatus = async (
           rejectedAt: new Date(),
         }),
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).populate("userId", "firstName lastName email");
 
     if (!service) {
@@ -254,7 +254,7 @@ export const updateServiceStatus = async (
 
 export const deleteServiceRequest = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const service = await Service.findById(req.params.id);
@@ -311,7 +311,7 @@ export const deleteServiceRequest = async (
 
 export const approveServiceRequest = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { notes } = req.body;
@@ -324,7 +324,7 @@ export const approveServiceRequest = async (
         approvedBy: req.user?.id,
         approvedAt: new Date(),
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).populate("userId", "firstName lastName email");
 
     if (!service) {
@@ -375,7 +375,7 @@ export const approveServiceRequest = async (
 
 export const rejectServiceRequest = async (
   req: AuthRequest,
-  res: Response
+  res: Response,
 ): Promise<void> => {
   try {
     const { rejectionReason, notes } = req.body;
@@ -397,7 +397,7 @@ export const rejectServiceRequest = async (
         rejectedBy: req.user?.id,
         rejectedAt: new Date(),
       },
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     ).populate("userId", "firstName lastName email");
 
     if (!service) {

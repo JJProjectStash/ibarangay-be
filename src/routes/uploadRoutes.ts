@@ -15,13 +15,13 @@ router.post(
   authenticate,
   upload.single("file"),
   optimizeImage,
-  uploadComplaintAttachment
+  uploadComplaintAttachment,
 );
 
 router.delete(
   "/complaints/:id/attachments/:fileUrl",
   authenticate,
-  deleteComplaintAttachment
+  deleteComplaintAttachment,
 );
 
 // Event image routes
@@ -31,7 +31,7 @@ router.post(
   authorize("admin", "staff"),
   upload.single("image"),
   optimizeImage,
-  uploadEventImage
+  uploadEventImage,
 );
 
 export default router;
