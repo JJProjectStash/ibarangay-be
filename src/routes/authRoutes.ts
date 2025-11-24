@@ -11,6 +11,7 @@ import {
   verifyUser,
   deleteUser,
   createStaffAdmin,
+  getCsrfToken,
 } from "../controllers/authController";
 import { authenticate, authorize } from "../middleware/auth";
 import {
@@ -26,6 +27,7 @@ import { authLimiter } from "../middleware/rateLimiter";
 const router = Router();
 
 // Public routes
+router.get("/csrf-token", getCsrfToken);
 router.post("/register", authLimiter, registerValidation, register);
 router.post("/login", authLimiter, loginValidation, login);
 router.post("/refresh-token", refreshToken);

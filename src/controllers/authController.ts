@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import User from "../models/User";
 import AuditLog from "../models/AuditLog";
 import Notification from "../models/Notification";
@@ -35,6 +36,31 @@ const generateRefreshToken = (id: string): string => {
   return jwt.sign({ id }, jwtRefreshSecret, {
     expiresIn: jwtRefreshExpire,
   } as jwt.SignOptions);
+};
+
+/**
+ * Get CSRF token
+ */
+export const getCsrfToken = async (
+  _req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    // Generate a random CSRF token
+    const csrfToken = crypto.randomBytes(32).toString("hex");
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        csrfToken,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to generate CSRF token",
+    });
+  }
 };
 
 /**
